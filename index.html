@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perpetual Calendar</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#151b24; --panel2:#1c2430; --text:#f4f7fb;
+    --muted:#9da9b8; --accent:#7c9cff; --accent2:#9c7cff;
+    --line:#2a3442; --today:#283c66; --holiday:#332744;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100vh; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    color:var(--text); background:
+      radial-gradient(circle at 20% 0%, #1d2740 0, transparent 34%),
+      radial-gradient(circle at 90% 20%, #241a3a 0, transparent 30%), var(--bg);
+  }
+  .app{width:min(1100px,94vw);margin:0 auto;padding:28px 0 44px}
+  header{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:24px}
+  h1{font-size:clamp(1.6rem,4vw,2.5rem);margin:0;letter-spacing:-.04em}
+  .subtitle{color:var(--muted);margin-top:5px}
+  button,select{font:inherit}
+  button{
+    border:1px solid var(--line); background:var(--panel); color:var(--text); border-radius:12px;
+    padding:10px 14px; cursor:pointer; transition:.15s;
+  }
+  button:hover{background:var(--panel2);transform:translateY(-1px)}
+  .today-btn{border-color:#526da9;background:#1a2640}
+  .picker{
+    display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:16px;
+    background:rgba(21,27,36,.88);border:1px solid var(--line);border-radius:22px;
+    backdrop-filter:blur(12px); margin-bottom:18px;
+  }
+  .wheel-wrap{position:relative;text-align:center}
+  .wheel-label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.14em;margin-bottom:6px}
+  .wheel{
+    height:170px; overflow-y:auto; scroll-snap-type:y mandatory; scrollbar-width:none;
+    border-radius:16px; background:linear-gradient(180deg,var(--panel2),#111720);
+    border:1px solid var(--line); padding:57px 0;
+  }
+  .wheel::-webkit-scrollbar{display:none}
+  .wheel::before,.wheel::after{content:"";position:absolute;left:10px;right:10px;height:56px;pointer-events:none;z-index:2}
+  .wheel::before{top:28px;background:linear-gradient(var(--panel),transparent)}
+  .wheel::after{bottom:0;background:linear-gradient(transparent,var(--panel))}
+  .wheel-item{
+    height:56px;display:flex;align-items:center;justify-content:center;scroll-snap-align:center;
+    color:#687586;font-size:1.05rem;transition:.15s
+  }
+  .wheel-item.selected{color:var(--text);font-size:1.3rem;font-weight:700}
+  .wheel-highlight{
+    position:absolute;left:10px;right:10px;top:57px;height:56px;border-top:1px solid #52617a;
+    border-bottom:1px solid #52617a;border-radius:9px;pointer-events:none;z-index:3
+  }
+  .calendar-card{background:rgba(21,27,36,.9);border:1px solid var(--line);border-radius:24px;padding:22px}
+  .cal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+  .cal-title{text-align:center;flex:1}
+  .cal-title h2{margin:0;font-size:clamp(1.4rem,4vw,2.2rem);letter-spacing:-.03em}
+  .cal-title p{margin:4px 0 0;color:var(--muted)}
+  .week,.days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+  .week div{text-align:center;color:var(--muted);font-size:.76rem;text-transform:uppercase;padding:8px 0}
+  .day{
+    min-height:74px;border:1px solid var(--line);border-radius:12px;background:#121821;
+    padding:8px;position:relative;cursor:pointer;
+  }
+  .day:hover{background:#1a222e}
+  .day.empty{background:transparent;border-color:transparent;cursor:default}
+  .day-num{font-weight:650}
+  .day.selected{outline:2px solid var(--accent);background:var(--today)}
+  .day.holiday{background:var(--holiday)}
+  .holiday-name{position:absolute;left:7px;right:5px;bottom:6px;color:#d6b9ff;font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:.8rem;margin-top:16px}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;background:var(--holiday);border:1px solid #755a91}
+  .info{margin-top:18px;padding:15px 17px;background:#111720;border:1px solid var(--line);border-radius:16px;color:var(--muted)}
+  .info strong{color:var(--text)}
+  @media(max-width:650px){
+    .app{padding-top:18px}
+    header{align-items:flex-start}
+    .picker{gap:7px;padding:10px}
+    .wheel{height:154px;padding:49px 0}
+    .wheel-highlight{top:49px;height:56px}
+    .wheel-item{height:56px;font-size:.92rem}
+    .wheel-item.selected{font-size:1.1rem}
+    .day{min-height:62px;padding:6px;font-size:.88rem}
+    .holiday-name{font-size:.58rem}
+    .calendar-card{padding:12px}
+    .cal-head button{padding:8px 10px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <h1>Perpetual Calendar</h1>
+      <div class="subtitle">Explore dates from 1500 through 3000 and beyond.</div>
+    </div>
+    <button class="today-btn" id="todayBtn">Today</button>
+  </header>
+
+  <section class="picker" aria-label="Date picker">
+    <div class="wheel-wrap">
+      <div class="wheel-label">Year</div>
+      <div class="wheel-highlight"></div>
+      <div class="wheel" id="yearWheel"></div>
+    </div>
+    <div class="wheel-wrap">
+      <div class="wheel-label">Month</div>
+      <div class="wheel-highlight"></div>
+      <div class="wheel" id="monthWheel"></div>
+    </div>
+    <div class="wheel-wrap">
+      <div class="wheel-label">Day</div>
+      <div class="wheel-highlight"></div>
+      <div class="wheel" id="dayWheel"></div>
+    </div>
+  </section>
+
+  <section class="calendar-card">
+    <div class="cal-head">
+      <button id="prevMonth" aria-label="Previous month">‹</button>
+      <div class="cal-title">
+        <h2 id="monthTitle"></h2>
+        <p id="dateDescription"></p>
+      </div>
+      <button id="nextMonth" aria-label="Next month">›</button>
+    </div>
+    <div class="week" id="week"></div>
+    <div class="days" id="days"></div>
+    <div class="legend"><span><span class="dot"></span>Holiday / observance</span></div>
+    <div class="info" id="info"></div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+
+  // Built-in U.S. holiday rules. The calendar engine itself is perpetual;
+  // holiday rules can be expanded or replaced with a historical holiday database.
+  const fixedHolidays = {
+    "1-1":"New Year's Day","2-14":"Valentine's Day","7-4":"Independence Day",
+    "10-31":"Halloween","12-25":"Christmas Day"
+  };
+
+  function nthWeekday(year, month, weekday, n){
+    const first = new Date(year, month-1, 1).getDay();
+    return 1 + ((weekday - first + 7) % 7) + (n-1)*7;
+  }
+  function lastWeekday(year, month, weekday){
+    const last = new Date(year, month, 0).getDate();
+    const d = new Date(year, month-1, last).getDay();
+    return last - ((d-weekday+7)%7);
+  }
+  function easterSunday(year){
+    // Gregorian computus
+    const a=year%19,b=Math.floor(year/100),c=year%100,d=Math.floor(b/4),e=b%4;
+    const f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30;
+    const i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7;
+    const m=Math.floor((a+11*h+22*l)/451);
+    const month=Math.floor((h+l-7*m+114)/31), day=((h+l-7*m+114)%31)+1;
+    return {month,day};
+  }
+  function holidays(year, month){
+    const out = {};
+    const add=(m,d,name)=>{ if(m===month) out[d]=name; };
+    Object.entries(fixedHolidays).forEach(([key,name])=>{
+      const [m,d]=key.split("-").map(Number); add(m,d,name);
+    });
+    if(month===1) add(1,nthWeekday(year,1,1,3),"Martin Luther King Jr. Day");
+    if(month===2) add(2,nthWeekday(year,2,1,3),"Presidents' Day");
+    if(month===5) add(5,lastWeekday(year,5,1),"Memorial Day");
+    if(month===6) add(6,nthWeekday(year,6,0,3),"Father's Day");
+    if(month===9) add(9,nthWeekday(year,9,1,1),"Labor Day");
+    if(month===11) add(11,nthWeekday(year,11,4,4),"Thanksgiving Day");
+    const easter=easterSunday(year);
+    if(easter.month===month) add(month,easter.day,"Easter Sunday");
+    return out;
+  }
+
+  let selected = new Date();
+  selected.setHours(12,0,0,0);
+  const state = {year:selected.getFullYear(), month:selected.getMonth(), day:selected.getDate()};
+
+  const yearWheel=document.getElementById("yearWheel");
+  const monthWheel=document.getElementById("monthWheel");
+  const dayWheel=document.getElementById("dayWheel");
+
+  function daysInMonth(y,m){ return new Date(y,m+1,0).getDate(); }
+
+  function makeWheel(el, values, selectedIndex, formatter, onSelect){
+    el.innerHTML="";
+    values.forEach((value,i)=>{
+      const item=document.createElement("div");
+      item.className="wheel-item";
+      item.textContent=formatter(value);
+      item.dataset.index=i;
+      item.addEventListener("click",()=>{ el.scrollTo({top:i*56,behavior:"smooth"}); });
+      el.appendChild(item);
+    });
+    requestAnimationFrame(()=>{
+      el.scrollTop=Math.max(0,selectedIndex*56);
+      updateSelected(el);
+    });
+    let timer;
+    el.onscroll=()=>{
+      clearTimeout(timer);
+      timer=setTimeout(()=>{
+        const index=Math.max(0,Math.min(values.length-1,Math.round(el.scrollTop/56)));
+        el.scrollTo({top:index*56,behavior:"smooth"});
+        onSelect(values[index]);
+        updateSelected(el);
+      },100);
+    };
+  }
+  function updateSelected(el){
+    const index=Math.round(el.scrollTop/56);
+    [...el.children].forEach((x,i)=>x.classList.toggle("selected",i===index));
+  }
+
+  function rebuildWheels(){
+    const maxDay=daysInMonth(state.year,state.month);
+    if(state.day>maxDay) state.day=maxDay;
+    makeWheel(yearWheel,Array.from({length:1501},(_,i)=>1500+i),state.year-1500,String,y=>{state.year=y; render(); rebuildDayWheel();});
+    makeWheel(monthWheel,MONTHS,state.month,m=>m,(m)=>{state.month=MONTHS.indexOf(m); if(state.day>daysInMonth(state.year,state.month))state.day=daysInMonth(state.year,state.month); render(); rebuildDayWheel();});
+    rebuildDayWheel();
+  }
+  function rebuildDayWheel(){
+    const max=daysInMonth(state.year,state.month);
+    makeWheel(dayWheel,Array.from({length:max},(_,i)=>i+1),state.day-1,String,d=>{state.day=d;render();});
+  }
+
+  function render(){
+    const y=state.year,m=state.month,d=state.day;
+    document.getElementById("monthTitle").textContent=`${MONTHS[m]} ${y}`;
+    const date=new Date(y,m,d);
+    const holidayMap=holidays(y,m+1);
+    document.getElementById("dateDescription").textContent=`${WEEKDAYS[date.getDay()]}, ${MONTHS[m]} ${d}, ${y}`;
+    document.getElementById("week").innerHTML=WEEKDAYS.map(x=>`<div>${x.slice(0,3)}</div>`).join("");
+
+    const first=new Date(y,m,1).getDay(), total=daysInMonth(y,m);
+    const cells=[];
+    for(let i=0;i<first;i++) cells.push('<div class="day empty"></div>');
+    for(let n=1;n<=total;n++){
+      const holiday=holidayMap[n];
+      cells.push(`<div class="day ${n===d?'selected ':''}${holiday?'holiday':''}" data-day="${n}">
+        <div class="day-num">${n}</div>${holiday?`<div class="holiday-name" title="${holiday}">${holiday}</div>`:""}
+      </div>`);
+    }
+    document.getElementById("days").innerHTML=cells.join("");
+    document.querySelectorAll(".day[data-day]").forEach(el=>el.addEventListener("click",()=>{
+      state.day=Number(el.dataset.day); rebuildDayWheel(); render();
+    }));
+    let info=holidayMap[d] ? `<strong>${holidayMap[d]}</strong><br>` : "";
+    info += `Selected date: <strong>${WEEKDAYS[date.getDay()]}, ${MONTHS[m]} ${d}, ${y}</strong>.`;
+    document.getElementById("info").innerHTML=info;
+  }
+
+  document.getElementById("prevMonth").onclick=()=>{
+    state.month--; if(state.month<0){state.month=11;state.year--;}
+    state.day=Math.min(state.day,daysInMonth(state.year,state.month)); rebuildWheels(); render();
+  };
+  document.getElementById("nextMonth").onclick=()=>{
+    state.month++; if(state.month>11){state.month=0;state.year++;}
+    state.day=Math.min(state.day,daysInMonth(state.year,state.month)); rebuildWheels(); render();
+  };
+  document.getElementById("todayBtn").onclick=()=>{
+    const now=new Date(); state.year=now.getFullYear();state.month=now.getMonth();state.day=now.getDate();
+    rebuildWheels();render();
+  };
+
+  // Initial render
+  rebuildWheels();
+  render();
+})();
+</script>
+</body>
+</html>
