@@ -36,22 +36,26 @@
   .wheel-wrap{position:relative;text-align:center}
   .wheel-label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.14em;margin-bottom:6px}
   .wheel{
-    height:170px; overflow-y:auto; scroll-snap-type:y mandatory; scrollbar-width:none;
+    height:190px; overflow-y:auto; scroll-snap-type:y mandatory; scrollbar-width:none;
+    -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; touch-action:pan-y;
     border-radius:16px; background:linear-gradient(180deg,var(--panel2),#111720);
-    border:1px solid var(--line); padding:57px 0;
+    border:1px solid var(--line); padding:67px 0;
   }
   .wheel::-webkit-scrollbar{display:none}
   .wheel::before,.wheel::after{content:"";position:absolute;left:10px;right:10px;height:56px;pointer-events:none;z-index:2}
   .wheel::before{top:28px;background:linear-gradient(var(--panel),transparent)}
   .wheel::after{bottom:0;background:linear-gradient(transparent,var(--panel))}
   .wheel-item{
-    height:56px;display:flex;align-items:center;justify-content:center;scroll-snap-align:center;
-    color:#687586;font-size:1.05rem;transition:.15s
+    height:56px;display:flex;align-items:center;justify-content:center;
+    scroll-snap-align:center; scroll-snap-stop:normal;
+    color:#687586;font-size:1.05rem;transition:color .12s,transform .12s;
+    user-select:none;-webkit-user-select:none;
   }
   .wheel-item.selected{color:var(--text);font-size:1.3rem;font-weight:700}
   .wheel-highlight{
-    position:absolute;left:10px;right:10px;top:57px;height:56px;border-top:1px solid #52617a;
-    border-bottom:1px solid #52617a;border-radius:9px;pointer-events:none;z-index:3
+    position:absolute;left:10px;right:10px;top:67px;height:56px;
+    border-top:2px solid #52617a;border-bottom:2px solid #52617a;border-radius:10px;
+    pointer-events:none;z-index:3;box-shadow:0 0 18px rgba(124,156,255,.08);
   }
   .calendar-card{background:rgba(21,27,36,.9);border:1px solid var(--line);border-radius:24px;padding:22px}
   .cal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
@@ -78,8 +82,8 @@
     .app{padding-top:18px}
     header{align-items:flex-start}
     .picker{gap:7px;padding:10px}
-    .wheel{height:154px;padding:49px 0}
-    .wheel-highlight{top:49px;height:56px}
+    .wheel{height:174px;padding:59px 0}
+    .wheel-highlight{top:59px;height:56px}
     .wheel-item{height:56px;font-size:.92rem}
     .wheel-item.selected{font-size:1.1rem}
     .day{min-height:62px;padding:6px;font-size:.88rem}
@@ -190,6 +194,24 @@
 
   function daysInMonth(y,m){ return new Date(y,m+1,0).getDate(); }
 
+  function centerIndex(el, index, behavior="smooth"){
+    const item = el.children[index];
+    if (!item) return;
+    item.scrollIntoView({block:"center", inline:"nearest", behavior});
+  }
+
+  function getCenteredIndex(el, count){
+    const center = el.scrollTop + el.clientHeight / 2;
+    let best = 0, bestDistance = Infinity;
+    for(let i=0;i<count;i++){
+      const item = el.children[i];
+      const itemCenter = item.offsetTop + item.offsetHeight / 2;
+      const distance = Math.abs(itemCenter - center);
+      if(distance < bestDistance){ bestDistance = distance; best = i; }
+    }
+    return best;
+  }
+
   function makeWheel(el, values, selectedIndex, formatter, onSelect){
     el.innerHTML="";
     values.forEach((value,i)=>{
@@ -197,27 +219,35 @@
       item.className="wheel-item";
       item.textContent=formatter(value);
       item.dataset.index=i;
-      item.addEventListener("click",()=>{ el.scrollTo({top:i*56,behavior:"smooth"}); });
+      item.addEventListener("click",()=>{
+        centerIndex(el,i,"smooth");
+      });
       el.appendChild(item);
     });
+
     requestAnimationFrame(()=>{
-      el.scrollTop=Math.max(0,selectedIndex*56);
+      centerIndex(el, selectedIndex, "auto");
       updateSelected(el);
     });
+
     let timer;
     el.onscroll=()=>{
+      updateSelected(el);
       clearTimeout(timer);
       timer=setTimeout(()=>{
-        const index=Math.max(0,Math.min(values.length-1,Math.round(el.scrollTop/56)));
-        el.scrollTo({top:index*56,behavior:"smooth"});
+        const index=getCenteredIndex(el,values.length);
+        centerIndex(el,index,"smooth");
         onSelect(values[index]);
         updateSelected(el);
-      },100);
+      },140);
     };
   }
+
   function updateSelected(el){
-    const index=Math.round(el.scrollTop/56);
-    [...el.children].forEach((x,i)=>x.classList.toggle("selected",i===index));
+    const index=getCenteredIndex(el,el.children.length);
+    [...el.children].forEach((x,i)=>{
+      x.classList.toggle("selected",i===index);
+    });
   }
 
   function rebuildWheels(){
