@@ -36,24 +36,25 @@
   .wheel-wrap{position:relative;text-align:center}
   .wheel-label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.14em;margin-bottom:6px}
   .wheel{
-    height:190px; overflow-y:auto; scroll-snap-type:y proximity; scrollbar-width:none;
+    position:relative;height:190px; overflow-y:auto; scroll-snap-type:none; scrollbar-width:none;
     -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; touch-action:pan-y;
     border-radius:16px; background:linear-gradient(180deg,var(--panel2),#111720);
     border:1px solid var(--line); padding:67px 0;
   }
   .wheel::-webkit-scrollbar{display:none}
+  #yearWheel .wheel-item{height:42px}
   .wheel::before,.wheel::after{content:"";position:absolute;left:10px;right:10px;height:56px;pointer-events:none;z-index:2}
-  .wheel::before{top:28px;background:linear-gradient(var(--panel),transparent)}
+  .wheel::before{top:0;background:linear-gradient(var(--panel),transparent)}
   .wheel::after{bottom:0;background:linear-gradient(transparent,var(--panel))}
   .wheel-item{
-    height:56px;display:flex;align-items:center;justify-content:center;
-    scroll-snap-align:center; scroll-snap-stop:normal;
+    height:52px;display:flex;align-items:center;justify-content:center;
+    
     color:#687586;font-size:1.05rem;transition:color .12s,transform .12s;
     user-select:none;-webkit-user-select:none;
   }
   .wheel-item.selected{color:var(--text);font-size:1.3rem;font-weight:700}
   .wheel-highlight{
-    position:absolute;left:10px;right:10px;top:67px;height:56px;
+    position:absolute;left:10px;right:10px;top:88px;height:56px;
     border-top:2px solid #52617a;border-bottom:2px solid #52617a;border-radius:10px;
     pointer-events:none;z-index:3;box-shadow:0 0 18px rgba(124,156,255,.08);
   }
@@ -83,8 +84,8 @@
     header{align-items:flex-start}
     .picker{gap:7px;padding:10px}
     .wheel{height:174px;padding:59px 0}
-    .wheel-highlight{top:59px;height:56px}
-    .wheel-item{height:56px;font-size:.92rem}
+    .wheel-highlight{top:80px}
+    .wheel-item{height:52px;font-size:.92rem}
     .wheel-item.selected{font-size:1.1rem}
     .day{min-height:62px;padding:6px;font-size:.88rem}
     .holiday-name{font-size:.58rem}
@@ -245,6 +246,10 @@
 
   function daysInMonth(y,m){ return new Date(y,m+1,0).getDate(); }
 
+  const WHEEL_CYCLES = 9;
+  const WHEEL_CENTER_CYCLE = Math.floor(WHEEL_CYCLES/2);
+  const YEAR_MIN = 1500, YEAR_MAX = 3000;
+
   function centerIndex(el,index,behavior="smooth"){
     const item=el.children[index];
     if(!item) return;
@@ -252,21 +257,20 @@
     el.scrollTo({top:Math.max(0,target),behavior});
   }
 
-  function getCenteredIndex(el,count){
+  function centeredIndex(el){
+    const first=el.children[0];
+    if(!first) return 0;
+    const row=first.offsetHeight || 52;
     const center=el.scrollTop+el.clientHeight/2;
-    let best=0,bestDistance=Infinity;
-    for(let i=0;i<count;i++){
-      const item=el.children[i];
-      const itemCenter=item.offsetTop+item.offsetHeight/2;
-      const distance=Math.abs(itemCenter-center);
-      if(distance<bestDistance){bestDistance=distance;best=i;}
-    }
-    return best;
+    return Math.max(0,Math.min(el.children.length-1,Math.round((center-first.offsetTop-row/2)/row)));
   }
 
-  function makeWheel(el,values,selectedIndex,formatter,onSelect){
+  function makeWheel(el,values,selectedIndex,formatter,onSelect,opts={}){
     el.innerHTML="";
-    values.forEach((value,i)=>{
+    const base=values.length;
+    const circular=!!opts.circular;
+    const renderValues=circular ? Array.from({length:base*WHEEL_CYCLES},(_,i)=>values[i%base]) : values;
+    renderValues.forEach((value,i)=>{
       const item=document.createElement("div");
       item.className="wheel-item";
       item.textContent=formatter(value);
@@ -274,35 +278,66 @@
       item.addEventListener("click",()=>centerIndex(el,i,"smooth"));
       el.appendChild(item);
     });
-    requestAnimationFrame(()=>{centerIndex(el,selectedIndex,"auto");updateSelected(el);});
+
+    const initialIndex=circular ? WHEEL_CENTER_CYCLE*base+selectedIndex : selectedIndex;
+    requestAnimationFrame(()=>{centerIndex(el,initialIndex,"auto");updateSelected(el);});
+
     let timer;
     el.onscroll=()=>{
       updateSelected(el);
       clearTimeout(timer);
       timer=setTimeout(()=>{
-        const index=getCenteredIndex(el,values.length);
+        let index=centeredIndex(el);
+        if(circular){
+          const logical=((index%base)+base)%base;
+          onSelect(values[logical]);
+          const cycle=Math.floor(index/base);
+          if(cycle<=1 || cycle>=WHEEL_CYCLES-2){
+            const middle=WHEEL_CENTER_CYCLE*base+logical;
+            centerIndex(el,middle,"auto");
+            index=middle;
+          }
+        }else{
+          onSelect(values[index]);
+        }
         centerIndex(el,index,"smooth");
-        onSelect(values[index]);
         updateSelected(el);
-      },420);
+      },180);
     };
   }
 
   function updateSelected(el){
-    const index=getCenteredIndex(el,el.children.length);
-    [...el.children].forEach((x,i)=>x.classList.toggle("selected",i===index));
+    const index=centeredIndex(el);
+    const lo=Math.max(0,index-3), hi=Math.min(el.children.length-1,index+3);
+    for(let i=lo;i<=hi;i++) el.children[i].classList.toggle("selected",i===index);
   }
 
   function rebuildWheels(){
     const maxDay=daysInMonth(state.year,state.month);
     if(state.day>maxDay) state.day=maxDay;
-    makeWheel(yearWheel,Array.from({length:1501},(_,i)=>1500+i),state.year-1500,String,y=>{state.year=y; render(); rebuildDayWheel();});
-    makeWheel(monthWheel,MONTHS,state.month,m=>m,(m)=>{state.month=MONTHS.indexOf(m); if(state.day>daysInMonth(state.year,state.month))state.day=daysInMonth(state.year,state.month); render(); rebuildDayWheel();});
+    const years=Array.from({length:YEAR_MAX-YEAR_MIN+1},(_,i)=>YEAR_MIN+i);
+    makeWheel(yearWheel,years,state.year-YEAR_MIN,String,y=>{
+      state.year=y;
+      const max=daysInMonth(state.year,state.month);
+      if(state.day>max) state.day=max;
+      render();
+      rebuildDayWheel();
+    });
+    makeWheel(monthWheel,MONTHS,state.month,m=>m,m=>{
+      state.month=MONTHS.indexOf(m);
+      const max=daysInMonth(state.year,state.month);
+      if(state.day>max) state.day=max;
+      render();
+      rebuildDayWheel();
+    },{circular:true});
     rebuildDayWheel();
   }
+
   function rebuildDayWheel(){
     const max=daysInMonth(state.year,state.month);
-    makeWheel(dayWheel,Array.from({length:max},(_,i)=>i+1),state.day-1,String,d=>{state.day=d;render();});
+    if(state.day>max) state.day=max;
+    const days=Array.from({length:max},(_,i)=>i+1);
+    makeWheel(dayWheel,days,state.day-1,String,d=>{state.day=d;render();},{circular:true});
   }
 
 
