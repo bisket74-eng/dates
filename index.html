@@ -105,6 +105,10 @@
   .calendar-event{position:absolute;left:7px;right:5px;bottom:6px;color:#c9d7ff;font-size:.66rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .day.has-event{background:#182844;border-color:#45649e}
   @media(max-width:650px){.event-grid{grid-template-columns:1fr}.event-panel{padding:14px}}
+  .countdown-option{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:.9rem;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#151b24}.countdown-option input{width:18px;height:18px;accent-color:var(--accent)}
+  .countdown-fields{display:grid;grid-template-columns:1fr 150px 130px;gap:10px;margin-top:10px}.countdown-fields input,.countdown-fields select{width:100%;height:44px;border:1px solid var(--line);border-radius:11px;background:#151b24;color:var(--text);padding:0 11px;font:inherit;outline:none}.countdown-fields input:focus,.countdown-fields select:focus{border-color:var(--accent)}.countdown-hint{margin-top:8px;color:var(--muted);font-size:.78rem}
+  .countdowns-panel{margin-top:18px;padding:18px;background:#111720;border:1px solid var(--line);border-radius:18px}.countdowns-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.countdowns-head h3{margin:0;font-size:1.05rem}.countdowns-head span{color:var(--muted);font-size:.8rem}.countdown-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.countdown-card{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:16px;background:linear-gradient(135deg,#171f2a,#111720);padding:16px}.countdown-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--card-color,#7c9cff)}.countdown-title{font-size:1.05rem;font-weight:750;padding-left:5px;padding-right:28px}.countdown-target{color:var(--muted);font-size:.8rem;margin:5px 0 13px;padding-left:5px}.countdown-time{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-left:5px}.countdown-unit{background:#0e141c;border:1px solid var(--line);border-radius:10px;padding:8px 4px;text-align:center}.countdown-number{font-size:1.15rem;font-weight:800;line-height:1.1}.countdown-label{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:3px}.delete-countdown{position:absolute;right:10px;top:9px;border:0;background:transparent;padding:4px 7px;color:var(--muted);font-size:1.1rem}.delete-countdown:hover{color:var(--text);background:#242d3a;transform:none}.empty-countdowns{color:var(--muted);padding:10px 2px}
+  @media(max-width:650px){.countdown-fields{grid-template-columns:1fr 1fr}.countdown-fields input:first-child{grid-column:1/-1}.countdown-list{grid-template-columns:1fr}.countdowns-panel{padding:14px}}
 </style>
 </head>
 <body>
@@ -163,11 +167,24 @@
       </div>
       <div class="event-actions">
         <label class="age-toggle"><input type="checkbox" id="ageToggle"> Track age on yearly repeats</label>
+        <label class="countdown-option"><input type="checkbox" id="countdownToggle"> Add countdown clock</label>
         <button class="save-event" id="saveEvent">Save note</button>
         <button id="clearEvent">Clear</button>
       </div>
+      <div class="countdown-fields" id="countdownFields" hidden>
+        <input id="countdownTitle" type="text" placeholder="Countdown title (e.g. Retirement)">
+        <input id="countdownTime" type="time" value="00:00" aria-label="Countdown time">
+        <select id="countdownColor" aria-label="Countdown color">
+          <option value="#7c9cff">Blue</option><option value="#9c7cff">Purple</option><option value="#5ac8a8">Green</option><option value="#e5a84b">Gold</option><option value="#e56b7d">Rose</option><option value="#55b9d6">Cyan</option>
+        </select>
+      </div>
+      <div class="countdown-hint" id="countdownHint" hidden>Countdowns are saved for future dates and appear in your Countdown Clocks below.</div>
       <div class="event-preview" id="eventPreview"></div>
     </div>
+    <section class="countdowns-panel" aria-label="Countdown Clocks">
+      <div class="countdowns-head"><h3>Countdown Clocks</h3><span id="countdownCount"></span></div>
+      <div class="countdown-list" id="countdownList"></div>
+    </section>
   </section>
 </div>
 
@@ -290,51 +307,43 @@
 
 
   const EVENT_KEY="perpetualCalendarEvents_v1";
+  const COUNTDOWN_KEY="perpetualCalendarCountdowns_v1";
   function loadEvents(){try{return JSON.parse(localStorage.getItem(EVENT_KEY)||"[]")}catch{return []}}
   function saveEvents(list){localStorage.setItem(EVENT_KEY,JSON.stringify(list))}
+  function loadCountdowns(){try{return JSON.parse(localStorage.getItem(COUNTDOWN_KEY)||"[]")}catch{return []}}
+  function saveCountdowns(list){localStorage.setItem(COUNTDOWN_KEY,JSON.stringify(list))}
   function iso(y,m,d){return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`}
   function daysBetween(a,b){return Math.round((Date.UTC(b.getFullYear(),b.getMonth(),b.getDate())-Date.UTC(a.getFullYear(),a.getMonth(),a.getDate()))/86400000)}
-  function eventMatches(ev,y,m,d){
-    const base=new Date(ev.y,ev.m,ev.d), cur=new Date(y,m,d), diff=daysBetween(base,cur);
-    if(diff<0) return false;
-    if(ev.repeat==="none") return diff===0;
-    if(ev.repeat==="daily") return true;
-    if(ev.repeat==="weekly") return diff%7===0;
-    if(ev.repeat==="monthly") return d===ev.d && (y*12+m)-(ev.y*12+ev.m)>=0;
-    if(ev.repeat==="yearly") return m===ev.m && d===ev.d;
-    return false;
-  }
+  function eventMatches(ev,y,m,d){const base=new Date(ev.y,ev.m,ev.d),cur=new Date(y,m,d),diff=daysBetween(base,cur);if(diff<0)return false;if(ev.repeat==="none")return diff===0;if(ev.repeat==="daily")return true;if(ev.repeat==="weekly")return diff%7===0;if(ev.repeat==="monthly")return d===ev.d&&(y*12+m)-(ev.y*12+ev.m)>=0;if(ev.repeat==="yearly")return m===ev.m&&d===ev.d;return false}
   function eventsFor(y,m,d){return loadEvents().filter(ev=>eventMatches(ev,y,m,d))}
-  function eventLabel(ev,y){
-    let text=ev.note||"Note";
-    if(ev.repeat==="yearly" && ev.age){
-      const age=y-ev.y;
-      if(age>=0) text += ` · ${age} year${age===1?"":"s"} old`;
-    }
-    return text;
+  function eventLabel(ev,y){let text=ev.note||"Note";if(ev.repeat==="yearly"&&ev.age){const age=y-ev.y;if(age>=0)text+=` · ${age} year${age===1?"":"s"} old`}return text}
+  function localTarget(c){const [hh,mm]=(c.time||"00:00").split(":").map(Number);return new Date(c.y,c.m,c.d,hh||0,mm||0,0,0)}
+  function esc(v){return String(v).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]))}
+  function renderCountdowns(){
+    const listEl=document.getElementById("countdownList"),countEl=document.getElementById("countdownCount");
+    const now=new Date(), active=loadCountdowns().filter(c=>localTarget(c)>now).sort((a,b)=>localTarget(a)-localTarget(b));
+    countEl.textContent=`${active.length} active`;
+    if(!active.length){listEl.innerHTML='<div class="empty-countdowns">No active countdown clocks yet. Pick a future date, add a note, and turn on “Add countdown clock.”</div>';return}
+    listEl.innerHTML=active.map(c=>{let ms=localTarget(c)-now;const days=Math.floor(ms/86400000);ms%=86400000;const hours=Math.floor(ms/3600000);ms%=3600000;const mins=Math.floor(ms/60000);ms%=60000;const secs=Math.floor(ms/1000);const target=localTarget(c).toLocaleString(undefined,{month:"long",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"});return `<article class="countdown-card" style="--card-color:${c.color||"#7c9cff"}"><button class="delete-countdown" data-countdown-id="${c.id}" title="Delete countdown" aria-label="Delete countdown">×</button><div class="countdown-title">${esc(c.title||"Countdown")}</div><div class="countdown-target">Until ${target}</div><div class="countdown-time"><div class="countdown-unit"><div class="countdown-number">${String(days).padStart(2,"0")}</div><div class="countdown-label">Days</div></div><div class="countdown-unit"><div class="countdown-number">${String(hours).padStart(2,"0")}</div><div class="countdown-label">Hours</div></div><div class="countdown-unit"><div class="countdown-number">${String(mins).padStart(2,"0")}</div><div class="countdown-label">Min</div></div><div class="countdown-unit"><div class="countdown-number">${String(secs).padStart(2,"0")}</div><div class="countdown-label">Sec</div></div></div></article>`}).join("");
+    document.querySelectorAll(".delete-countdown").forEach(btn=>btn.onclick=()=>{saveCountdowns(loadCountdowns().filter(c=>String(c.id)!==String(btn.dataset.countdownId)));renderCountdowns()});
   }
   function refreshEventEditor(){
-    const key=iso(state.year,state.month,state.day);
-    const ev=loadEvents().find(x=>iso(x.y,x.m,x.d)===key);
-    document.getElementById("noteInput").value=ev?.note||"";
-    document.getElementById("repeatSelect").value=ev?.repeat||"none";
-    document.getElementById("ageToggle").checked=!!ev?.age;
-    document.getElementById("eventPreview").textContent=ev ? `Saved: ${ev.repeat}${ev.age?" · age tracking":""}` : "No saved note for this date.";
+    const key=iso(state.year,state.month,state.day),ev=loadEvents().find(x=>iso(x.y,x.m,x.d)===key),c=loadCountdowns().find(x=>x.y===state.year&&x.m===state.month&&x.d===state.day);
+    document.getElementById("noteInput").value=ev?.note||"";document.getElementById("repeatSelect").value=ev?.repeat||"none";document.getElementById("ageToggle").checked=!!ev?.age;
+    document.getElementById("countdownToggle").checked=!!c;document.getElementById("countdownTitle").value=c?.title||ev?.note||"";document.getElementById("countdownTime").value=c?.time||"00:00";document.getElementById("countdownColor").value=c?.color||"#7c9cff";updateCountdownFields();
+    let p=ev?`Saved note: ${ev.repeat}${ev.age?" · age tracking":""}`:"No saved note for this date.";if(c)p+=` · Countdown: ${c.title||"Untitled"}`;document.getElementById("eventPreview").textContent=p;
   }
+  function updateCountdownFields(){const on=document.getElementById("countdownToggle").checked;document.getElementById("countdownFields").hidden=!on;document.getElementById("countdownHint").hidden=!on}
   function wireEvents(){
+    document.getElementById("countdownToggle").onchange=updateCountdownFields;
     document.getElementById("saveEvent").onclick=()=>{
-      const note=document.getElementById("noteInput").value.trim();
-      const repeat=document.getElementById("repeatSelect").value;
-      const age=document.getElementById("ageToggle").checked && repeat==="yearly";
-      const list=loadEvents().filter(x=>iso(x.y,x.m,x.d)!==iso(state.year,state.month,state.day));
-      if(note){list.push({y:state.year,m:state.month,d:state.day,note,repeat,age});saveEvents(list)}else saveEvents(list);
-      render();refreshEventEditor();
+      const note=document.getElementById("noteInput").value.trim(),repeat=document.getElementById("repeatSelect").value,age=document.getElementById("ageToggle").checked&&repeat==="yearly",on=document.getElementById("countdownToggle").checked,key=iso(state.year,state.month,state.day);
+      const events=loadEvents().filter(x=>iso(x.y,x.m,x.d)!==key);if(note)events.push({y:state.year,m:state.month,d:state.day,note,repeat,age});saveEvents(events);
+      let cs=loadCountdowns().filter(c=>!(c.y===state.year&&c.m===state.month&&c.d===state.day));
+      if(on){const time=document.getElementById("countdownTime").value||"00:00",[hh,mm]=time.split(":").map(Number),target=new Date(state.year,state.month,state.day,hh,mm,0,0);if(target<=new Date()){alert("A countdown clock needs a future date and time. Please choose a future date.");render();return}cs.push({id:Date.now(),y:state.year,m:state.month,d:state.day,time,title:document.getElementById("countdownTitle").value.trim()||note||"Countdown",color:document.getElementById("countdownColor").value})}
+      saveCountdowns(cs);render();refreshEventEditor();renderCountdowns();
     };
-    document.getElementById("clearEvent").onclick=()=>{
-      const key=iso(state.year,state.month,state.day);
-      saveEvents(loadEvents().filter(x=>iso(x.y,x.m,x.d)!==key));
-      render();refreshEventEditor();
-    };
+    document.getElementById("clearEvent").onclick=()=>{const key=iso(state.year,state.month,state.day);saveEvents(loadEvents().filter(x=>iso(x.y,x.m,x.d)!==key));saveCountdowns(loadCountdowns().filter(c=>!(c.y===state.year&&c.m===state.month&&c.d===state.day)));render();refreshEventEditor();renderCountdowns()};
   }
 
   function render(){
@@ -366,6 +375,7 @@
     if(selectedEvents.length) info += `<br><strong>${selectedEvents.map(ev=>eventLabel(ev,y)).join("<br>")}</strong>`;
     document.getElementById("info").innerHTML=info;
     refreshEventEditor();
+    renderCountdowns();
   }
 
   document.getElementById("prevMonth").onclick=()=>{
@@ -385,6 +395,7 @@
   wireEvents();
   rebuildWheels();
   render();
+  setInterval(renderCountdowns,1000);
 })();
 </script>
 </body>
