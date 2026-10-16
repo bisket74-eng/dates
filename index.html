@@ -93,7 +93,46 @@
     .cal-head button{padding:8px 10px}
   }
 
-  .event-panel{margin-top:18px;padding:18px;background:#111720;border:1px solid var(--line);border-radius:18px}
+  .editor-backdrop{
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,.62);
+    z-index:90;backdrop-filter:blur(3px);
+  }
+  .editor-backdrop.open{display:block}
+  .event-panel{
+    margin-top:18px;padding:18px;background:#111720;border:1px solid var(--line);border-radius:18px
+  }
+  .event-panel.modal-editor{
+    display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:min(720px,92vw);max-height:88vh;overflow:auto;margin:0;z-index:100;
+    box-shadow:0 24px 80px rgba(0,0,0,.55);border-color:#3b4b63;
+  }
+  .event-panel.modal-editor.open{display:block}
+  .editor-head{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;
+  }
+  .editor-head h3{margin:0}
+  .close-editor{
+    width:42px;height:42px;border-radius:12px;padding:0;font-size:1.35rem;
+    background:#202936;border-color:#3a4658;
+  }
+  .date-note-list{margin-top:12px;display:grid;gap:8px}
+  .date-note{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#111720;
+  }
+  .date-note-text{min-width:0}
+  .date-note-title{font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .date-note-meta{font-size:.76rem;color:var(--muted);margin-top:3px}
+  .add-note-btn{
+    margin-top:12px;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
+    border-color:#526da9;background:#1b2944;font-weight:750;
+  }
+  .info-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .info-action{
+    border-radius:10px;padding:7px 10px;font-size:.82rem;background:#182236;border-color:#3c537c;
+  }
+  .info-action.plus{font-weight:750}
+
   .event-panel h3{margin:0 0 12px;font-size:1.05rem}
   .event-grid{display:grid;grid-template-columns:1fr 180px;gap:12px}
   .notes{width:100%;min-height:88px;resize:vertical;border:1px solid var(--line);border-radius:12px;background:#151b24;color:var(--text);padding:12px;font:inherit;outline:none}
@@ -156,8 +195,12 @@
     <div class="legend"><span><span class="dot"></span>Holiday / observance</span></div>
     <div class="info" id="info"></div>
 
-    <div class="event-panel">
-      <h3>Notes &amp; Repeat</h3>
+    <div class="editor-backdrop" id="editorBackdrop"></div>
+    <div class="event-panel modal-editor" id="eventEditor">
+      <div class="editor-head">
+        <h3>Notes &amp; Repeat</h3>
+        <button class="close-editor" id="closeEditor" aria-label="Close notes">×</button>
+      </div>
       <div class="event-grid">
         <textarea class="notes" id="noteInput" placeholder="Write a note for this date…"></textarea>
         <select class="repeat-select" id="repeatSelect" aria-label="Repeat">
@@ -373,14 +416,37 @@
     let p=ev?`Saved note: ${ev.repeat}${ev.age?" · age tracking":""}`:"No saved note for this date.";if(c)p+=` · Countdown: ${c.title||"Untitled"}`;document.getElementById("eventPreview").textContent=p;
   }
   function updateCountdownFields(){const on=document.getElementById("countdownToggle").checked;document.getElementById("countdownFields").hidden=!on;document.getElementById("countdownHint").hidden=!on}
+  function openEditor(editExisting){
+    const panel=document.getElementById("eventEditor"),back=document.getElementById("editorBackdrop");
+    panel.classList.add("open");back.classList.add("open");
+    refreshEventEditor();
+    if(!editExisting){
+      document.getElementById("noteInput").value="";
+      document.getElementById("repeatSelect").value="none";
+      document.getElementById("ageToggle").checked=false;
+      document.getElementById("countdownToggle").checked=false;
+      document.getElementById("countdownTitle").value="";
+      document.getElementById("countdownTime").value="00:00";
+      updateCountdownFields();
+      document.getElementById("eventPreview").textContent="Add a note for this date.";
+    }
+    setTimeout(()=>document.getElementById("noteInput").focus(),80);
+  }
+  function closeEditor(){
+    document.getElementById("eventEditor").classList.remove("open");
+    document.getElementById("editorBackdrop").classList.remove("open");
+  }
   function wireEvents(){
+    document.getElementById("closeEditor").onclick=closeEditor;
+    document.getElementById("editorBackdrop").onclick=closeEditor;
+    document.addEventListener("keydown",e=>{if(e.key==="Escape")closeEditor()});
     document.getElementById("countdownToggle").onchange=updateCountdownFields;
     document.getElementById("saveEvent").onclick=()=>{
       const note=document.getElementById("noteInput").value.trim(),repeat=document.getElementById("repeatSelect").value,age=document.getElementById("ageToggle").checked&&repeat==="yearly",on=document.getElementById("countdownToggle").checked,key=iso(state.year,state.month,state.day);
       const events=loadEvents().filter(x=>iso(x.y,x.m,x.d)!==key);if(note)events.push({y:state.year,m:state.month,d:state.day,note,repeat,age});saveEvents(events);
       let cs=loadCountdowns().filter(c=>!(c.y===state.year&&c.m===state.month&&c.d===state.day));
       if(on){const time=document.getElementById("countdownTime").value||"00:00",[hh,mm]=time.split(":").map(Number),target=new Date(state.year,state.month,state.day,hh,mm,0,0);if(target<=new Date()){alert("A countdown clock needs a future date and time. Please choose a future date.");render();return}cs.push({id:Date.now(),y:state.year,m:state.month,d:state.day,time,title:document.getElementById("countdownTitle").value.trim()||note||"Countdown",color:document.getElementById("countdownColor").value})}
-      saveCountdowns(cs);render();refreshEventEditor();renderCountdowns();
+      saveCountdowns(cs);render();refreshEventEditor();renderCountdowns();closeEditor();
     };
     document.getElementById("deleteNote").onclick=()=>{
       const key=iso(state.year,state.month,state.day);
@@ -388,9 +454,9 @@
       document.getElementById("noteInput").value="";
       document.getElementById("repeatSelect").value="none";
       document.getElementById("ageToggle").checked=false;
-      render();refreshEventEditor();renderCountdowns();
+      render();refreshEventEditor();renderCountdowns();closeEditor();
     };
-    document.getElementById("clearEvent").onclick=()=>{const key=iso(state.year,state.month,state.day);saveEvents(loadEvents().filter(x=>iso(x.y,x.m,x.d)!==key));saveCountdowns(loadCountdowns().filter(c=>!(c.y===state.year&&c.m===state.month&&c.d===state.day)));render();refreshEventEditor();renderCountdowns()};
+    document.getElementById("clearEvent").onclick=()=>{const key=iso(state.year,state.month,state.day);saveEvents(loadEvents().filter(x=>iso(x.y,x.m,x.d)!==key));saveCountdowns(loadCountdowns().filter(c=>!(c.y===state.year&&c.m===state.month&&c.d===state.day)));render();refreshEventEditor();renderCountdowns();closeEditor()};
   }
 
   function render(){
@@ -420,7 +486,27 @@
     let info=holidayMap[d] ? `<strong>${holidayMap[d]}</strong><br>` : "";
     info += `Selected date: <strong>${WEEKDAYS[date.getDay()]}, ${MONTHS[m]} ${d}, ${y}</strong>.`;
     if(selectedEvents.length) info += `<br><strong>${selectedEvents.map(ev=>eventLabel(ev,y)).join("<br>")}</strong>`;
-    document.getElementById("info").innerHTML=info;
+    const infoEl=document.getElementById("info");
+    const savedNotes=eventsFor(y,m,d);
+    const noteRows=savedNotes.length ? `<div class="date-note-list">${
+      savedNotes.map((ev,i)=>`<div class="date-note">
+        <div class="date-note-text">
+          <div class="date-note-title">${esc(ev.note||"Note")}</div>
+          <div class="date-note-meta">${ev.repeat==="none"?"One time":ev.repeat.charAt(0).toUpperCase()+ev.repeat.slice(1)}${ev.age?" · age tracking":""}</div>
+        </div>
+      </div>`).join("")
+    }</div>` : "";
+    infoEl.innerHTML=`
+      ${holidayMap[d]?`<strong>${holidayMap[d]}</strong><br>`:""}
+      Selected date: <strong>${WEEKDAYS[date.getDay()]}, ${MONTHS[m]} ${d}, ${y}</strong>
+      ${noteRows}
+      <div class="info-actions">
+        <button class="info-action plus" id="openNoteEditor">＋ Add note</button>
+        ${savedNotes.length?`<button class="info-action" id="editNoteEditor">Edit note</button>`:""}
+      </div>`;
+    document.getElementById("openNoteEditor").onclick=()=>openEditor(false);
+    const editBtn=document.getElementById("editNoteEditor");
+    if(editBtn) editBtn.onclick=()=>openEditor(true);
     refreshEventEditor();
     renderCountdowns();
   }
