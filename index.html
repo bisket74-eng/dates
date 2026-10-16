@@ -36,7 +36,7 @@
   .wheel-wrap{position:relative;text-align:center}
   .wheel-label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.14em;margin-bottom:6px}
   .wheel{
-    height:190px; overflow-y:auto; scroll-snap-type:y mandatory; scrollbar-width:none;
+    height:190px; overflow-y:auto; scroll-snap-type:y proximity; scrollbar-width:none;
     -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; touch-action:pan-y;
     border-radius:16px; background:linear-gradient(180deg,var(--panel2),#111720);
     border:1px solid var(--line); padding:67px 0;
@@ -91,6 +91,20 @@
     .calendar-card{padding:12px}
     .cal-head button{padding:8px 10px}
   }
+
+  .event-panel{margin-top:18px;padding:18px;background:#111720;border:1px solid var(--line);border-radius:18px}
+  .event-panel h3{margin:0 0 12px;font-size:1.05rem}
+  .event-grid{display:grid;grid-template-columns:1fr 180px;gap:12px}
+  .notes{width:100%;min-height:88px;resize:vertical;border:1px solid var(--line);border-radius:12px;background:#151b24;color:var(--text);padding:12px;font:inherit;outline:none}
+  .notes:focus,.repeat-select:focus{border-color:var(--accent)}
+  .repeat-select{width:100%;height:46px;border:1px solid var(--line);border-radius:12px;background:#151b24;color:var(--text);padding:0 10px;font:inherit}
+  .event-actions{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap}
+  .save-event{background:#24345c;border-color:#526da9;font-weight:700}
+  .age-toggle{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.88rem}
+  .event-preview{margin-top:12px;color:var(--muted);font-size:.88rem;line-height:1.45}
+  .calendar-event{position:absolute;left:7px;right:5px;bottom:6px;color:#c9d7ff;font-size:.66rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .day.has-event{background:#182844;border-color:#45649e}
+  @media(max-width:650px){.event-grid{grid-template-columns:1fr}.event-panel{padding:14px}}
 </style>
 </head>
 <body>
@@ -134,6 +148,26 @@
     <div class="days" id="days"></div>
     <div class="legend"><span><span class="dot"></span>Holiday / observance</span></div>
     <div class="info" id="info"></div>
+
+    <div class="event-panel">
+      <h3>Notes &amp; Repeat</h3>
+      <div class="event-grid">
+        <textarea class="notes" id="noteInput" placeholder="Write a note for this date…"></textarea>
+        <select class="repeat-select" id="repeatSelect" aria-label="Repeat">
+          <option value="none">Does not repeat</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+      </div>
+      <div class="event-actions">
+        <label class="age-toggle"><input type="checkbox" id="ageToggle"> Track age on yearly repeats</label>
+        <button class="save-event" id="saveEvent">Save note</button>
+        <button id="clearEvent">Clear</button>
+      </div>
+      <div class="event-preview" id="eventPreview"></div>
+    </div>
   </section>
 </div>
 
@@ -194,42 +228,36 @@
 
   function daysInMonth(y,m){ return new Date(y,m+1,0).getDate(); }
 
-  function centerIndex(el, index, behavior="smooth"){
-    const item = el.children[index];
-    if (!item) return;
-    item.scrollIntoView({block:"center", inline:"nearest", behavior});
+  function centerIndex(el,index,behavior="smooth"){
+    const item=el.children[index];
+    if(!item) return;
+    const target=item.offsetTop-(el.clientHeight-item.offsetHeight)/2;
+    el.scrollTo({top:Math.max(0,target),behavior});
   }
 
-  function getCenteredIndex(el, count){
-    const center = el.scrollTop + el.clientHeight / 2;
-    let best = 0, bestDistance = Infinity;
+  function getCenteredIndex(el,count){
+    const center=el.scrollTop+el.clientHeight/2;
+    let best=0,bestDistance=Infinity;
     for(let i=0;i<count;i++){
-      const item = el.children[i];
-      const itemCenter = item.offsetTop + item.offsetHeight / 2;
-      const distance = Math.abs(itemCenter - center);
-      if(distance < bestDistance){ bestDistance = distance; best = i; }
+      const item=el.children[i];
+      const itemCenter=item.offsetTop+item.offsetHeight/2;
+      const distance=Math.abs(itemCenter-center);
+      if(distance<bestDistance){bestDistance=distance;best=i;}
     }
     return best;
   }
 
-  function makeWheel(el, values, selectedIndex, formatter, onSelect){
+  function makeWheel(el,values,selectedIndex,formatter,onSelect){
     el.innerHTML="";
     values.forEach((value,i)=>{
       const item=document.createElement("div");
       item.className="wheel-item";
       item.textContent=formatter(value);
       item.dataset.index=i;
-      item.addEventListener("click",()=>{
-        centerIndex(el,i,"smooth");
-      });
+      item.addEventListener("click",()=>centerIndex(el,i,"smooth"));
       el.appendChild(item);
     });
-
-    requestAnimationFrame(()=>{
-      centerIndex(el, selectedIndex, "auto");
-      updateSelected(el);
-    });
-
+    requestAnimationFrame(()=>{centerIndex(el,selectedIndex,"auto");updateSelected(el);});
     let timer;
     el.onscroll=()=>{
       updateSelected(el);
@@ -239,15 +267,13 @@
         centerIndex(el,index,"smooth");
         onSelect(values[index]);
         updateSelected(el);
-      },140);
+      },420);
     };
   }
 
   function updateSelected(el){
     const index=getCenteredIndex(el,el.children.length);
-    [...el.children].forEach((x,i)=>{
-      x.classList.toggle("selected",i===index);
-    });
+    [...el.children].forEach((x,i)=>x.classList.toggle("selected",i===index));
   }
 
   function rebuildWheels(){
@@ -260,6 +286,55 @@
   function rebuildDayWheel(){
     const max=daysInMonth(state.year,state.month);
     makeWheel(dayWheel,Array.from({length:max},(_,i)=>i+1),state.day-1,String,d=>{state.day=d;render();});
+  }
+
+
+  const EVENT_KEY="perpetualCalendarEvents_v1";
+  function loadEvents(){try{return JSON.parse(localStorage.getItem(EVENT_KEY)||"[]")}catch{return []}}
+  function saveEvents(list){localStorage.setItem(EVENT_KEY,JSON.stringify(list))}
+  function iso(y,m,d){return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`}
+  function daysBetween(a,b){return Math.round((Date.UTC(b.getFullYear(),b.getMonth(),b.getDate())-Date.UTC(a.getFullYear(),a.getMonth(),a.getDate()))/86400000)}
+  function eventMatches(ev,y,m,d){
+    const base=new Date(ev.y,ev.m,ev.d), cur=new Date(y,m,d), diff=daysBetween(base,cur);
+    if(diff<0) return false;
+    if(ev.repeat==="none") return diff===0;
+    if(ev.repeat==="daily") return true;
+    if(ev.repeat==="weekly") return diff%7===0;
+    if(ev.repeat==="monthly") return d===ev.d && (y*12+m)-(ev.y*12+ev.m)>=0;
+    if(ev.repeat==="yearly") return m===ev.m && d===ev.d;
+    return false;
+  }
+  function eventsFor(y,m,d){return loadEvents().filter(ev=>eventMatches(ev,y,m,d))}
+  function eventLabel(ev,y){
+    let text=ev.note||"Note";
+    if(ev.repeat==="yearly" && ev.age){
+      const age=y-ev.y;
+      if(age>=0) text += ` · ${age} year${age===1?"":"s"} old`;
+    }
+    return text;
+  }
+  function refreshEventEditor(){
+    const key=iso(state.year,state.month,state.day);
+    const ev=loadEvents().find(x=>iso(x.y,x.m,x.d)===key);
+    document.getElementById("noteInput").value=ev?.note||"";
+    document.getElementById("repeatSelect").value=ev?.repeat||"none";
+    document.getElementById("ageToggle").checked=!!ev?.age;
+    document.getElementById("eventPreview").textContent=ev ? `Saved: ${ev.repeat}${ev.age?" · age tracking":""}` : "No saved note for this date.";
+  }
+  function wireEvents(){
+    document.getElementById("saveEvent").onclick=()=>{
+      const note=document.getElementById("noteInput").value.trim();
+      const repeat=document.getElementById("repeatSelect").value;
+      const age=document.getElementById("ageToggle").checked && repeat==="yearly";
+      const list=loadEvents().filter(x=>iso(x.y,x.m,x.d)!==iso(state.year,state.month,state.day));
+      if(note){list.push({y:state.year,m:state.month,d:state.day,note,repeat,age});saveEvents(list)}else saveEvents(list);
+      render();refreshEventEditor();
+    };
+    document.getElementById("clearEvent").onclick=()=>{
+      const key=iso(state.year,state.month,state.day);
+      saveEvents(loadEvents().filter(x=>iso(x.y,x.m,x.d)!==key));
+      render();refreshEventEditor();
+    };
   }
 
   function render(){
@@ -275,17 +350,22 @@
     for(let i=0;i<first;i++) cells.push('<div class="day empty"></div>');
     for(let n=1;n<=total;n++){
       const holiday=holidayMap[n];
-      cells.push(`<div class="day ${n===d?'selected ':''}${holiday?'holiday':''}" data-day="${n}">
-        <div class="day-num">${n}</div>${holiday?`<div class="holiday-name" title="${holiday}">${holiday}</div>`:""}
+      const dayEvents=eventsFor(y,m,n);
+      const eventText=dayEvents.length?eventLabel(dayEvents[0],y):"";
+      cells.push(`<div class="day ${n===d?'selected ':''}${holiday?'holiday ':''}${dayEvents.length?'has-event':''}" data-day="${n}">
+        <div class="day-num">${n}</div>${holiday?`<div class="holiday-name" title="${holiday}">${holiday}</div>`:""}${eventText?`<div class="calendar-event" title="${eventText}">${eventText}</div>`:""}
       </div>`);
     }
     document.getElementById("days").innerHTML=cells.join("");
     document.querySelectorAll(".day[data-day]").forEach(el=>el.addEventListener("click",()=>{
       state.day=Number(el.dataset.day); rebuildDayWheel(); render();
     }));
+    const selectedEvents=eventsFor(y,m,d);
     let info=holidayMap[d] ? `<strong>${holidayMap[d]}</strong><br>` : "";
     info += `Selected date: <strong>${WEEKDAYS[date.getDay()]}, ${MONTHS[m]} ${d}, ${y}</strong>.`;
+    if(selectedEvents.length) info += `<br><strong>${selectedEvents.map(ev=>eventLabel(ev,y)).join("<br>")}</strong>`;
     document.getElementById("info").innerHTML=info;
+    refreshEventEditor();
   }
 
   document.getElementById("prevMonth").onclick=()=>{
@@ -302,6 +382,7 @@
   };
 
   // Initial render
+  wireEvents();
   rebuildWheels();
   render();
 })();
