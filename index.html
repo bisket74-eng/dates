@@ -397,7 +397,7 @@
   function daysBetween(a,b){return Math.round((Date.UTC(b.getFullYear(),b.getMonth(),b.getDate())-Date.UTC(a.getFullYear(),a.getMonth(),a.getDate()))/86400000)}
   function eventMatches(ev,y,m,d){const base=new Date(ev.y,ev.m,ev.d),cur=new Date(y,m,d),diff=daysBetween(base,cur);if(diff<0)return false;if(ev.repeat==="none")return diff===0;if(ev.repeat==="daily")return true;if(ev.repeat==="weekly")return diff%7===0;if(ev.repeat==="monthly")return d===ev.d&&(y*12+m)-(ev.y*12+ev.m)>=0;if(ev.repeat==="yearly")return m===ev.m&&d===ev.d;return false}
   function eventsFor(y,m,d){return loadEvents().filter(ev=>eventMatches(ev,y,m,d))}
-  function eventLabel(ev,y){let text=ev.note||"Note";if(ev.repeat==="yearly"&&ev.age){const age=y-ev.y;if(age>=0)text+=` · ${age} year${age===1?"":"s"} old`}return text}
+  function eventLabel(ev,y){let text=ev.note||"Note";if(ev.repeat==="yearly"&&ev.age){const age=y-ev.y;if(age>=0)text+=` · ${age} year${age===1?"":"s"}`}return text}
   function localTarget(c){const [hh,mm]=(c.time||"00:00").split(":").map(Number);return new Date(c.y,c.m,c.d,hh||0,mm||0,0,0)}
   function esc(v){return String(v).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]))}
   function renderCountdowns(){
@@ -492,7 +492,11 @@
       savedNotes.map((ev,i)=>`<div class="date-note">
         <div class="date-note-text">
           <div class="date-note-title">${esc(ev.note||"Note")}</div>
-          <div class="date-note-meta">${ev.repeat==="none"?"One time":ev.repeat.charAt(0).toUpperCase()+ev.repeat.slice(1)}${ev.age?" · age tracking":""}</div>
+          <div class="date-note-meta">${
+          ev.repeat==="yearly" && ev.age
+            ? `${Math.max(0,y-ev.y)} years`
+            : (ev.repeat==="none" ? "One time" : ev.repeat.charAt(0).toUpperCase()+ev.repeat.slice(1))
+        }</div>
         </div>
       </div>`).join("")
     }</div>` : "";
