@@ -127,6 +127,16 @@
     margin-top:12px;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
     border-color:#526da9;background:#1b2944;font-weight:750;
   }
+  .quick-add{margin:4px 0 14px}
+  .quick-add-label{font-size:.78rem;color:var(--muted);margin-bottom:8px}
+  .quick-add-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .quick-add-btn{
+    min-height:42px;padding:8px 6px;border-radius:11px;background:#151d29;
+    border:1px solid var(--line);color:var(--text);font:inherit;font-size:.78rem;font-weight:650;
+  }
+  .quick-add-btn:hover{border-color:#526da9;background:#1b2944;transform:none}
+  @media(max-width:650px){.quick-add-grid{grid-template-columns:repeat(2,1fr)}}
+
   .info-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
   .info-action{
     border-radius:10px;padding:7px 10px;font-size:.82rem;background:#182236;border-color:#3c537c;
@@ -200,6 +210,17 @@
       <div class="editor-head">
         <h3>Notes &amp; Repeat</h3>
         <button class="close-editor" id="closeEditor" aria-label="Close notes">×</button>
+      </div>
+      <div class="quick-add">
+        <div class="quick-add-label">Quick Add</div>
+        <div class="quick-add-grid">
+          <button type="button" class="quick-add-btn" data-quick="review">🔄 Yearly Review</button>
+          <button type="button" class="quick-add-btn" data-quick="birthday">🎂 Birthday</button>
+          <button type="button" class="quick-add-btn" data-quick="anniversary">💍 Anniversary</button>
+          <button type="button" class="quick-add-btn" data-quick="trip">✈️ Trip</button>
+          <button type="button" class="quick-add-btn" data-quick="retirement">💼 Retirement</button>
+          <button type="button" class="quick-add-btn" data-quick="custom">📌 Custom</button>
+        </div>
       </div>
       <div class="event-grid">
         <textarea class="notes" id="noteInput" placeholder="Write a note for this date…"></textarea>
@@ -437,6 +458,39 @@
     document.getElementById("editorBackdrop").classList.remove("open");
   }
   function wireEvents(){
+    document.querySelectorAll(".quick-add-btn").forEach(btn=>{
+      btn.onclick=()=>{
+        const type=btn.dataset.quick;
+        const note=document.getElementById("noteInput");
+        const repeat=document.getElementById("repeatSelect");
+        const age=document.getElementById("ageToggle");
+        const countdown=document.getElementById("countdownToggle");
+        const title=document.getElementById("countdownTitle");
+        const presets={
+          review:{text:"Yearly Review",repeat:"yearly",age:false,countdown:false},
+          birthday:{text:"Birthday",repeat:"yearly",age:true,countdown:false},
+          anniversary:{text:"Anniversary",repeat:"yearly",age:true,countdown:false},
+          trip:{text:"Trip",repeat:"none",age:false,countdown:true},
+          retirement:{text:"Retirement",repeat:"none",age:false,countdown:true},
+          custom:{text:"",repeat:"none",age:false,countdown:false}
+        };
+        const preset=presets[type];
+        if(!preset) return;
+        if(preset.text) note.value=preset.text;
+        repeat.value=preset.repeat;
+        age.checked=preset.age;
+        countdown.checked=preset.countdown;
+        if(preset.countdown){
+          title.value=note.value;
+          updateCountdownFields();
+          document.getElementById("eventPreview").textContent="Add the countdown date/time and save.";
+        }else{
+          updateCountdownFields();
+          document.getElementById("eventPreview").textContent=`Quick Add: ${preset.text || "Custom"}`;
+        }
+        note.focus();
+      };
+    });
     document.getElementById("closeEditor").onclick=closeEditor;
     document.getElementById("editorBackdrop").onclick=closeEditor;
     document.addEventListener("keydown",e=>{if(e.key==="Escape")closeEditor()});
