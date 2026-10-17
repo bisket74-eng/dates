@@ -127,6 +127,8 @@
     margin-top:12px;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
     border-color:#526da9;background:#1b2944;font-weight:750;
   }
+  html{scroll-behavior:smooth}
+  .calendar-focus-target{scroll-margin-top:14px}
   .view-switch{display:flex;gap:6px;width:max-content;margin:0 auto 12px;padding:4px;background:#111720;border:1px solid var(--line);border-radius:13px}
   .view-btn{min-width:92px;padding:9px 16px;border:0;border-radius:9px;background:transparent;color:var(--muted);font:inherit;font-weight:750}
   .view-btn.active{background:#273b62;color:var(--text)}
@@ -219,7 +221,7 @@
     <button type="button" class="view-btn" id="yearViewBtn">Year</button>
   </div>
 
-  <section class="year-view" id="yearView" aria-label="Year view">
+  <section class="year-view calendar-focus-target" id="yearView" aria-label="Year view">
     <div class="year-view-head">
       <button type="button" id="yearPrev" aria-label="Previous year">‹</button>
       <h3 id="yearViewTitle"></h3>
@@ -229,7 +231,7 @@
     <div class="year-note-list" id="yearNoteList"></div>
   </section>
 
-  <section class="calendar-card" id="monthView">
+  <section class="calendar-card calendar-focus-target" id="monthView">
     <div class="cal-head">
       <button id="prevMonth" aria-label="Previous month">‹</button>
       <div class="cal-title">
@@ -583,7 +585,7 @@
       return `<div class="mini-month"><div class="mini-month-title">${name}</div><div class="mini-week">${weekNames.map(w=>`<span>${w}</span>`).join("")}</div><div class="mini-days">${cells}</div></div>`;
     }).join("");
     list.innerHTML=items.length
-      ? items.map(x=>`<div class="year-note-item"><div class="year-note-date">${MONTHS[x.m].slice(0,3)} ${x.d}</div><div class="year-note-text">${escapeHtml(x.text)}</div></div>`).join("")
+      ? items.map(x=>`<div class="year-note-item"><div class="year-note-date">${MONTHS[x.m].slice(0,3)} ${x.d}</div><div class="year-note-text">${esc(x.text)}</div></div>`).join("")
       : `<div class="empty-countdowns">No saved notes in ${y}.</div>`;
     grid.querySelectorAll("[data-year-day]").forEach(btn=>{
       btn.onclick=()=>{
@@ -594,13 +596,24 @@
     });
   }
 
-  function setCalendarView(view){
+  function focusCalendar(view){
+    const target=document.getElementById(view==="year" ? "yearView" : "monthView");
+    if(!target) return;
+    // Let the view finish rendering/layout before moving the page, so the
+    // picker slides naturally out of the way and the calendar gets the focus.
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      target.scrollIntoView({behavior:"smooth",block:"start"});
+    }));
+  }
+
+  function setCalendarView(view, shouldScroll=true){
     calendarView=view;
     document.getElementById("monthView").style.display=view==="month"?"":"none";
     document.getElementById("yearView").classList.toggle("open",view==="year");
     document.getElementById("monthViewBtn").classList.toggle("active",view==="month");
     document.getElementById("yearViewBtn").classList.toggle("active",view==="year");
     if(view==="year") renderYearView();
+    if(shouldScroll) focusCalendar(view);
   }
 
   function render(){
