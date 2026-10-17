@@ -116,6 +116,8 @@
     background:#202936;border-color:#3a4658;
   }
   .date-note-list{margin-top:12px;display:grid;gap:8px}
+  button.date-note{font:inherit;text-align:left;width:100%;cursor:pointer;color:inherit}
+  button.date-note:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .date-note{
     display:flex;align-items:center;justify-content:space-between;gap:10px;
     padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#111720;
@@ -154,7 +156,7 @@
   @media(max-width:460px){.year-grid{grid-template-columns:1fr}}
   .quick-add{margin:4px 0 14px}
   .quick-add-label{font-size:.78rem;color:var(--muted);margin-bottom:8px}
-  .quick-add-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .quick-add-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
   .quick-add-btn{
     min-height:42px;padding:8px 6px;border-radius:11px;background:#151d29;
     border:1px solid var(--line);color:var(--text);font:inherit;font-size:.78rem;font-weight:650;
@@ -181,7 +183,7 @@
   .event-preview{margin-top:12px;color:var(--muted);font-size:.88rem;line-height:1.45}
   .calendar-event{--event-color:#f29a3f;position:absolute;left:7px;right:5px;bottom:6px;color:#c9d7ff;font-size:.66rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .day.has-event{background:#182844;border-color:#45649e}
-  @media(max-width:650px){.event-grid{grid-template-columns:1fr}.quick-add-grid{grid-template-columns:1fr}.countdown-fields{justify-content:flex-start}.event-panel{padding:14px}}
+  @media(max-width:650px){.event-grid{grid-template-columns:1fr}.quick-add-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.quick-add-btn{font-size:.78rem;padding:9px 4px}.countdown-fields{justify-content:flex-start}.event-panel{padding:14px}}
   .countdown-option{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.88rem}.countdown-option input{width:18px;height:18px;accent-color:var(--accent)}
   .auto-color-legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin:8px 0 2px;color:var(--muted);font-size:.75rem}
   .auto-color-legend span{display:inline-flex;align-items:center;gap:5px}
@@ -262,6 +264,7 @@
           <button type="button" class="quick-add-btn" data-quick="trip">✈️ Trip</button>
           <button type="button" class="quick-add-btn" data-quick="retirement">💼 Retirement</button>
           <button type="button" class="quick-add-btn" data-quick="custom">📌 Custom</button>
+          <button type="button" class="quick-add-btn" data-quick="countdown">⏱️ Countdown Clock</button>
           <div class="countdown-fields" id="countdownFields" hidden>
             <input id="countdownTime" type="time" value="00:00" aria-label="Countdown time">
           </div>
@@ -492,10 +495,28 @@
     let p=ev?`Saved note: ${ev.repeat}${ev.age?" · age tracking":""}`:"No saved note for this date.";if(c)p+=` · Countdown: ${c.title||ev?.note||"Untitled"}`;document.getElementById("eventPreview").textContent=p;
   }
   function updateCountdownFields(){const on=document.getElementById("countdownToggle").checked;document.getElementById("countdownFields").hidden=!on;document.getElementById("countdownHint").hidden=!on}
-  function openEditor(editExisting){
+  function openEditor(edit=false, noteId=null){
+    window.__editingNoteId = edit ? noteId : null;
+
     const panel=document.getElementById("eventEditor"),back=document.getElementById("editorBackdrop");
     panel.classList.add("open");back.classList.add("open");
     refreshEventEditor();
+    if(edit && noteId!==null){
+      const target=eventsFor(state.year,state.month,state.day).find(x=>Number(x.id)===Number(noteId));
+      if(target){
+        document.getElementById("note").value=target.note||"";
+        document.getElementById("repeat").value=target.repeat||"none";
+        document.getElementById("age").checked=!!target.age;
+        document.querySelectorAll(".quick-add-btn").forEach(b=>b.classList.toggle("active",b.dataset.quick===target.type));
+        if(document.getElementById("countdownToggle")){
+          const c=(typeof countdownsFor==="function"?countdownsFor(state.year,state.month,state.day):[]).find(x=>x.eventId===target.id);
+          document.getElementById("countdownToggle").checked=!!c;
+          if(document.getElementById("countdownTime")) document.getElementById("countdownTime").value=c?.time||"00:00";
+          updateCountdownFields();
+        }
+      }
+    }
+
     if(!editExisting){
       document.getElementById("noteInput").value="";
       document.getElementById("repeatSelect").value="none";
@@ -662,7 +683,7 @@
     const infoEl=document.getElementById("info");
     const savedNotes=eventsFor(y,m,d);
     const noteRows=savedNotes.length ? `<div class="date-note-list">${
-      savedNotes.map((ev,i)=>`<div class="date-note">
+      savedNotes.map((ev,i)=>`<button type="button" class="date-note note-button" data-note-id="${ev.id}">
         <div class="date-note-text">
           <div class="date-note-title">${esc(ev.note||"Note")}</div>
           <div class="date-note-meta">${
@@ -671,7 +692,7 @@
             : (ev.repeat==="none" ? "One time" : ev.repeat.charAt(0).toUpperCase()+ev.repeat.slice(1))
         }</div>
         </div>
-      </div>`).join("")
+      </button>`).join("")
     }</div>` : "";
     infoEl.innerHTML=`
       ${holidayMap[d]?`<strong>${holidayMap[d]}</strong><br>`:""}
@@ -679,11 +700,11 @@
       ${noteRows}
       <div class="info-actions">
         <button class="info-action plus" id="openNoteEditor">＋ Add note</button>
-        ${savedNotes.length?`<button class="info-action" id="editNoteEditor">Edit note</button>`:""}
       </div>`;
     document.getElementById("openNoteEditor").onclick=()=>openEditor(false);
-    const editBtn=document.getElementById("editNoteEditor");
-    if(editBtn) editBtn.onclick=()=>openEditor(true);
+    document.querySelectorAll(".note-button").forEach(btn=>{
+      btn.onclick=()=>openEditor(true, Number(btn.dataset.noteId));
+    });
     if(!document.getElementById("eventEditor").classList.contains("open")) refreshEventEditor();
     renderCountdowns();
     if(calendarView==="year") renderYearView();
