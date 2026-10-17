@@ -128,7 +128,7 @@
     border-color:#526da9;background:#1b2944;font-weight:750;
   }
   html{scroll-behavior:smooth}
-  .calendar-focus-target{scroll-margin-top:14px}
+  .calendar-focus-target{scroll-margin-top:12px}
   .view-switch{display:flex;gap:6px;width:max-content;margin:0 auto 12px;padding:4px;background:#111720;border:1px solid var(--line);border-radius:13px}
   .view-btn{min-width:92px;padding:9px 16px;border:0;border-radius:9px;background:transparent;color:var(--muted);font:inherit;font-weight:750}
   .view-btn.active{background:#273b62;color:var(--text)}
@@ -578,7 +578,7 @@
         const cls=["mini-day"];
         if(evs.length) cls.push("note-day");
         if(istoday) cls.push("today-day");
-        const tip=escapeHtml(evs.map(e=>eventLabel(e,y)).join(" · "));
+        const tip=esc(evs.map(e=>eventLabel(e,y)).join(" · "));
         cells+=`<button class="${cls.join(" ")}" data-year-day="${m}-${d}" title="${tip}">${d}${evs.length?'<span class="note-dot"></span>':""}</button>`;
         evs.forEach(ev=>items.push({m,d,text:eventLabel(ev,y)}));
       }
@@ -613,7 +613,9 @@
     document.getElementById("monthViewBtn").classList.toggle("active",view==="month");
     document.getElementById("yearViewBtn").classList.toggle("active",view==="year");
     if(view==="year") renderYearView();
-    if(shouldScroll) focusCalendar(view);
+    if(shouldScroll){
+      requestAnimationFrame(()=>requestAnimationFrame(()=>focusCalendar(view)));
+    }
   }
 
   function render(){
