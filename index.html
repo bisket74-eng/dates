@@ -455,11 +455,28 @@
 
   const EVENT_KEY="perpetualCalendarEvents_v1";
   const COUNTDOWN_KEY="perpetualCalendarCountdowns_v1";
+  const COLOR_MIGRATION_KEY="perpetualCalendarBirthdayColorMigration_v1";
   function loadEvents(){
     try{
       const list=JSON.parse(localStorage.getItem(EVENT_KEY)||"[]");
       let changed=false;
-      list.forEach(ev=>{if(ev.id==null){ev.id=Date.now()+Math.floor(Math.random()*100000);changed=true} if(!ev.type){ev.type="custom";changed=true}});
+      list.forEach(ev=>{
+        if(ev.id==null){ev.id=Date.now()+Math.floor(Math.random()*100000);changed=true}
+        if(!ev.type){ev.type="birthday";changed=true}
+      });
+      // One-time correction for the calendar data that existed before category
+      // colors were reliable: all existing entries are birthdays except the
+      // user's retirement on September 1, 2031. New entries keep their chosen type.
+      if(!localStorage.getItem(COLOR_MIGRATION_KEY)){
+        list.forEach(ev=>{
+          if(Number(ev.y)===2031 && Number(ev.m)===8 && Number(ev.d)===1){
+            if(ev.type!=="retirement"){ev.type="retirement";changed=true}
+          }else if(ev.type!=="birthday"){
+            ev.type="birthday";changed=true
+          }
+        });
+        localStorage.setItem(COLOR_MIGRATION_KEY,"1");
+      }
       if(changed)localStorage.setItem(EVENT_KEY,JSON.stringify(list));
       return list;
     }catch{return []}
