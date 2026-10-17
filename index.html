@@ -145,7 +145,7 @@
   .mini-week span{text-align:center;color:var(--muted);font-size:.62rem}
   .mini-days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
   .mini-day{min-height:26px;border:0;border-radius:6px;background:transparent;color:var(--text);font-size:.66rem;padding:2px;position:relative}
-  .mini-day.note-day{background:#243653;box-shadow:inset 0 -2px 0 #7c9cff}
+  .mini-day.note-day{background:color-mix(in srgb,var(--event-color,#7c9cff) 22%,#141b25);box-shadow:inset 0 -2px 0 var(--event-color,#7c9cff)}
   .mini-day.today-day{outline:2px solid #7c9cff}
   .mini-day .note-dot{position:absolute;right:2px;bottom:2px;width:4px;height:4px;border-radius:50%;background:#c49aff}
   .year-note-list{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
@@ -182,7 +182,7 @@
   .age-toggle{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.88rem}
   .event-preview{margin-top:12px;color:var(--muted);font-size:.88rem;line-height:1.45}
   .calendar-event{--event-color:#f29a3f;position:absolute;left:7px;right:5px;bottom:6px;color:#c9d7ff;font-size:.66rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .day.has-event{background:#182844;border-color:#45649e}
+  .day.has-event{background:color-mix(in srgb,var(--event-color,#7c9cff) 22%,#121821);border-color:color-mix(in srgb,var(--event-color,#7c9cff) 55%,#45649e);box-shadow:inset 0 -3px 0 var(--event-color,#7c9cff)}
   @media(max-width:650px){.event-grid{grid-template-columns:1fr}.quick-add-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.quick-add-btn{font-size:.78rem;padding:9px 4px}.countdown-fields{justify-content:flex-start}.event-panel{padding:14px}}
   .countdown-option{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.88rem}.countdown-option input{width:18px;height:18px;accent-color:var(--accent)}
   .auto-color-legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin:8px 0 2px;color:var(--muted);font-size:.75rem}
@@ -646,7 +646,9 @@
         if(evs.length) cls.push("note-day");
         if(istoday) cls.push("today-day");
         const tip=esc(evs.map(e=>eventLabel(e,y)).join(" · "));
-        cells+=`<button class="${cls.join(" ")}" data-year-day="${m}-${d}" title="${tip}">${d}${evs.length?'<span class="note-dot"></span>':""}</button>`;
+        const dayColor=evs.length?eventColor(evs[0]):"";
+        const dayStyle=dayColor?` style="--event-color:${dayColor}"`:"";
+        cells+=`<button class="${cls.join(" ")}"${dayStyle} data-year-day="${m}-${d}" title="${tip}">${d}${evs.length?'<span class="note-dot"></span>':""}</button>`;
         evs.forEach(ev=>items.push({m,d,text:eventLabel(ev,y)}));
       }
       return `<div class="mini-month"><div class="mini-month-title">${name}</div><div class="mini-week">${weekNames.map(w=>`<span>${w}</span>`).join("")}</div><div class="mini-days">${cells}</div></div>`;
@@ -700,7 +702,8 @@
       const holiday=holidayMap[n];
       const dayEvents=eventsFor(y,m,n);
       const eventText=dayEvents.length?eventLabel(dayEvents[0],y):"";
-      cells.push(`<div class="day ${n===d?'selected ':''}${holiday?'holiday ':''}${dayEvents.length?'has-event':''}" data-day="${n}">
+      const dayStyle=dayEvents.length?` style="--event-color:${eventColor(dayEvents[0])}"`:"";
+      cells.push(`<div class="day ${n===d?'selected ':''}${holiday?'holiday ':''}${dayEvents.length?'has-event':''}"${dayStyle} data-day="${n}">
         <div class="day-num">${n}</div>${holiday?`<div class="holiday-name" title="${holiday}">${holiday}</div>`:""}${eventText?`<div class="calendar-event" style="--event-color:${eventColor(dayEvents[0])}" title="${eventText}">${eventText}</div>`:""}
       </div>`);
     }
