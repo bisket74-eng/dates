@@ -5,763 +5,535 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Perpetual Calendar</title>
 <style>
-  :root{
-    --bg:#0d1117; --panel:#151b24; --panel2:#1c2430; --text:#f4f7fb;
-    --muted:#9da9b8; --accent:#7c9cff; --accent2:#9c7cff;
-    --line:#2a3442; --today:#283c66; --holiday:#332744;
-  }
-  *{box-sizing:border-box}
-  body{
-    margin:0; min-height:100vh; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-    color:var(--text); background:
-      radial-gradient(circle at 20% 0%, #1d2740 0, transparent 34%),
-      radial-gradient(circle at 90% 20%, #241a3a 0, transparent 30%), var(--bg);
-  }
-  .app{width:min(1100px,94vw);margin:0 auto;padding:28px 0 44px}
-  header{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:24px}
-  h1{font-size:clamp(1.6rem,4vw,2.5rem);margin:0;letter-spacing:-.04em}
-  .subtitle{color:var(--muted);margin-top:5px}
-  button,select{font:inherit}
-  button{
-    border:1px solid var(--line); background:var(--panel); color:var(--text); border-radius:12px;
-    padding:10px 14px; cursor:pointer; transition:.15s;
-  }
-  button:hover{background:var(--panel2);transform:translateY(-1px)}
-  .today-btn{border-color:#526da9;background:#1a2640}
-  .picker{
-    display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:16px;
-    background:rgba(21,27,36,.88);border:1px solid var(--line);border-radius:22px;
-    backdrop-filter:blur(12px); margin-bottom:18px;
-  }
-  .wheel-wrap{position:relative;text-align:center}
-  .wheel-label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.14em;margin-bottom:6px}
-  .wheel{
-    position:relative;height:190px; overflow-y:auto; scroll-snap-type:none; scrollbar-width:none;
-    -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; touch-action:pan-y;
-    border-radius:16px; background:linear-gradient(180deg,var(--panel2),#111720);
-    border:1px solid var(--line); padding:67px 0;
-  }
-  .wheel::-webkit-scrollbar{display:none}
-  #yearWheel .wheel-item{height:42px}
-  .wheel::before,.wheel::after{content:"";position:absolute;left:10px;right:10px;height:56px;pointer-events:none;z-index:2}
-  .wheel::before{top:0;background:linear-gradient(var(--panel),transparent)}
-  .wheel::after{bottom:0;background:linear-gradient(transparent,var(--panel))}
-  .wheel-item{
-    height:52px;display:flex;align-items:center;justify-content:center;
-    
-    color:#687586;font-size:1.05rem;transition:color .12s,transform .12s;
-    user-select:none;-webkit-user-select:none;
-  }
-  .wheel-item.selected{color:var(--text);font-size:1.3rem;font-weight:700}
-  .wheel-highlight{
-    position:absolute;left:10px;right:10px;top:88px;height:56px;
-    border-top:2px solid #52617a;border-bottom:2px solid #52617a;border-radius:10px;
-    pointer-events:none;z-index:3;box-shadow:0 0 18px rgba(124,156,255,.08);
-  }
-  .calendar-card{background:rgba(21,27,36,.9);border:1px solid var(--line);border-radius:24px;padding:22px}
-  .cal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
-  .cal-title{text-align:center;flex:1}
-  .cal-title h2{margin:0;font-size:clamp(1.4rem,4vw,2.2rem);letter-spacing:-.03em}
-  .cal-title p{margin:4px 0 0;color:var(--muted)}
-  .week,.days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
-  .week div{text-align:center;color:var(--muted);font-size:.76rem;text-transform:uppercase;padding:8px 0}
-  .day{
-    min-height:74px;border:1px solid var(--line);border-radius:12px;background:#121821;
-    padding:8px;position:relative;cursor:pointer;
-  }
-  .day:hover{background:#1a222e}
-  .day.empty{background:transparent;border-color:transparent;cursor:default}
-  .day-num{font-weight:650}
-  .day.selected{outline:2px solid var(--accent);background:var(--today)}
-  .day.holiday{background:var(--holiday)}
-  .holiday-name{position:absolute;left:7px;right:5px;bottom:6px;color:#d6b9ff;font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .legend{display:flex;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:.8rem;margin-top:16px}
-  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;background:var(--holiday);border:1px solid #755a91}
-  .info{margin-top:18px;padding:15px 17px;background:#111720;border:1px solid var(--line);border-radius:16px;color:var(--muted)}
-  .info strong{color:var(--text)}
-  @media(max-width:650px){
-    .app{padding-top:18px}
-    header{align-items:flex-start}
-    .picker{gap:7px;padding:10px}
-    .wheel{height:174px;padding:59px 0}
-    .wheel-highlight{top:80px}
-    .wheel-item{height:52px;font-size:.92rem}
-    .wheel-item.selected{font-size:1.1rem}
-    .day{min-height:62px;padding:6px;font-size:.88rem}
-    .holiday-name{font-size:.58rem}
-    .calendar-card{padding:12px}
-    .cal-head button{padding:8px 10px}
-  }
-
-  .editor-backdrop{
-    display:none;position:fixed;inset:0;background:rgba(0,0,0,.62);
-    z-index:90;backdrop-filter:blur(3px);
-  }
-  .editor-backdrop.open{display:block}
-  .event-panel{
-    margin-top:18px;padding:18px;background:#111720;border:1px solid var(--line);border-radius:18px
-  }
-  .event-panel.modal-editor{
-    display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
-    width:min(720px,92vw);max-height:88vh;overflow:auto;margin:0;z-index:100;
-    box-shadow:0 24px 80px rgba(0,0,0,.55);border-color:#3b4b63;
-  }
-  .event-panel.modal-editor.open{display:block}
-  .editor-head{
-    display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;
-  }
-  .editor-head h3{margin:0}
-  .close-editor{
-    width:42px;height:42px;border-radius:12px;padding:0;font-size:1.35rem;
-    background:#202936;border-color:#3a4658;
-  }
-  .date-note-list{margin-top:12px;display:grid;gap:8px}
-  button.date-note{font:inherit;text-align:left;width:100%;cursor:pointer;color:inherit}
-  button.date-note:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  .date-note{
-    display:flex;align-items:center;justify-content:space-between;gap:10px;
-    padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#111720;
-  }
-  .date-note-text{min-width:0}
-  .date-note-title{font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .date-note-meta{font-size:.76rem;color:var(--muted);margin-top:3px}
-  .add-note-btn{
-    margin-top:12px;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
-    border-color:#526da9;background:#1b2944;font-weight:750;
-  }
-  html{scroll-behavior:smooth}
-  .calendar-focus-target{scroll-margin-top:12px}
-  .view-switch{display:flex;gap:6px;width:max-content;margin:0 auto 12px;padding:4px;background:#111720;border:1px solid var(--line);border-radius:13px}
-  .view-btn{min-width:92px;padding:9px 16px;border:0;border-radius:9px;background:transparent;color:var(--muted);font:inherit;font-weight:750}
-  .view-btn.active{background:#273b62;color:var(--text)}
-  .year-view{display:none;margin-bottom:18px;padding:18px;background:#111720;border:1px solid var(--line);border-radius:18px}
-  .year-view.open{display:block}
-  .year-view-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
-  .year-view-head h3{margin:0;font-size:1.3rem}
-  .year-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-  .mini-month{border:1px solid var(--line);border-radius:14px;padding:10px;background:#141b25}
-  .mini-month-title{font-weight:800;margin-bottom:8px}
-  .mini-week{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:3px}
-  .mini-week span{text-align:center;color:var(--muted);font-size:.62rem}
-  .mini-days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
-  .mini-day{min-height:26px;border:0;border-radius:6px;background:transparent;color:var(--text);font-size:.66rem;padding:2px;position:relative}
-  .mini-day.note-day{background:#243653;box-shadow:inset 0 -2px 0 #7c9cff}
-  .mini-day.today-day{outline:2px solid #7c9cff}
-  .mini-day .note-dot{position:absolute;right:2px;bottom:2px;width:4px;height:4px;border-radius:50%;background:#c49aff}
-  .year-note-list{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
-  .year-note-item{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #222c3a}
-  .year-note-date{min-width:74px;color:#aab6c8;font-size:.78rem}
-  .year-note-text{font-weight:650}
-  @media(max-width:700px){.year-grid{grid-template-columns:repeat(2,1fr)}}
-  @media(max-width:460px){.year-grid{grid-template-columns:1fr}}
-  .quick-add{margin:4px 0 14px}
-  .quick-add-label{font-size:.78rem;color:var(--muted);margin-bottom:8px}
-  .quick-add-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-  .quick-add-btn{
-    min-height:42px;padding:8px 6px;border-radius:11px;background:#151d29;
-    border:1px solid var(--line);color:var(--text);font:inherit;font-size:.78rem;font-weight:650;
-  }
-  .quick-add-btn:hover{border-color:#526da9;background:#1b2944;transform:none}
-  @media(max-width:650px){.quick-add-grid{grid-template-columns:repeat(2,1fr)}}
-
-  .info-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-  .info-action{
-    border-radius:10px;padding:7px 10px;font-size:.82rem;background:#182236;border-color:#3c537c;
-  }
-  .info-action.plus{font-weight:750}
-
-  .event-panel h3{margin:0 0 12px;font-size:1.05rem}
-  .event-grid{display:grid;grid-template-columns:1fr 180px;gap:12px}
-  .notes{width:100%;min-height:88px;resize:vertical;border:1px solid var(--line);border-radius:12px;background:#151b24;color:var(--text);padding:12px;font:inherit;outline:none}
-  .notes:focus,.repeat-select:focus{border-color:var(--accent)}
-  .repeat-select{width:100%;height:46px;border:1px solid var(--line);border-radius:12px;background:#151b24;color:var(--text);padding:0 10px;font:inherit}
-  .event-actions{display:grid;grid-template-columns:1fr auto;gap:12px 16px;align-items:center;margin-top:14px}
-  .age-toggle,.countdown-option{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.9rem}
-  .age-toggle{grid-column:1 / -1}
-  .countdown-option{grid-column:1}
-  .countdown-clock-btn{grid-column:2;width:48px;height:48px;border-radius:12px;border:1px solid #3a475a;background:#18202c;color:#667386;display:grid;place-items:center;cursor:not-allowed;opacity:.55;transition:.15s}
-  .countdown-clock-btn svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-  .countdown-clock-btn.enabled{color:var(--accent);border-color:#5577bd;background:#1b2b49;opacity:1;cursor:pointer}
-  .countdown-clock-btn.enabled:hover{transform:translateY(-1px)}
-  .native-time-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
-  .event-bottom-actions{grid-column:1 / -1;display:flex;justify-content:flex-end;align-items:center;gap:10px}
-  .event-bottom-actions #clearEvent{margin-right:auto}
-
-  .save-event{background:#24345c;border-color:#526da9;font-weight:700}
-  .delete-note{background:#3a2028;border-color:#75404c;color:#ffdce2;font-weight:750;min-width:42px;padding:10px 13px}
-  .delete-note:disabled{opacity:.35;cursor:not-allowed;transform:none}
-  .age-toggle{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.88rem}
-  .event-preview{margin-top:12px;color:var(--muted);font-size:.88rem;line-height:1.45}
-  .calendar-event{--event-color:#f29a3f;position:absolute;left:7px;right:5px;bottom:6px;color:#c9d7ff;font-size:.66rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .day.has-event{background:#182844;border-color:#45649e}
-  @media(max-width:650px){.event-grid{grid-template-columns:1fr}.quick-add-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.quick-add-btn{font-size:.78rem;padding:9px 4px}.countdown-fields{justify-content:flex-start}.event-panel{padding:14px}}
-  .countdown-option{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.88rem}.countdown-option input{width:18px;height:18px;accent-color:var(--accent)}
-  .auto-color-legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin:8px 0 2px;color:var(--muted);font-size:.75rem}
-  .auto-color-legend span{display:inline-flex;align-items:center;gap:5px}
-  .auto-color-legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
-  .countdown-fields{min-height:44px;display:flex;align-items:center;justify-content:center}.countdown-fields[hidden]{display:none}.countdown-fields input{width:100%;height:44px;border:1px solid var(--line);border-radius:11px;background:#151b24;color:var(--text);padding:0 11px;font:inherit;outline:none}.countdown-fields input:focus{border-color:var(--accent)}
-  .countdowns-panel{margin-top:18px;padding:18px;background:#111720;border:1px solid var(--line);border-radius:18px}.countdowns-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.countdowns-head h3{margin:0;font-size:1.05rem}.countdowns-head span{color:var(--muted);font-size:.8rem}.countdown-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.countdown-card{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:16px;background:linear-gradient(135deg,#171f2a,#111720);padding:16px}.countdown-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--card-color,#7c9cff)}.countdown-title{font-size:1.05rem;font-weight:750;padding-left:5px;padding-right:28px}.countdown-target{color:var(--muted);font-size:.8rem;margin:5px 0 13px;padding-left:5px}.countdown-time{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-left:5px}.countdown-unit{background:#0e141c;border:1px solid var(--line);border-radius:10px;padding:8px 4px;text-align:center}.countdown-number{font-size:1.15rem;font-weight:800;line-height:1.1}.countdown-label{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:3px}.delete-countdown{position:absolute;right:10px;top:9px;border:0;background:transparent;padding:4px 7px;color:var(--muted);font-size:1.1rem}.delete-countdown:hover{color:var(--text);background:#242d3a;transform:none}.empty-countdowns{color:var(--muted);padding:10px 2px}
-  @media(max-width:650px){.countdown-fields{grid-template-columns:1fr 1fr}.countdown-fields input:first-child{grid-column:1/-1}.countdown-list{grid-template-columns:1fr}.countdowns-panel{padding:14px}}
-.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}\n</style>
+:root{
+  --bg:#0d1117;--panel:#151b24;--panel2:#1c2430;--text:#f4f7fb;--muted:#9da9b8;
+  --accent:#7c9cff;--line:#2a3442;--today:#283c66;--holiday:#332744;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;min-height:100vh;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  color:var(--text);
+  background:radial-gradient(circle at 20% 0%,#1d2740 0,transparent 34%),
+             radial-gradient(circle at 90% 20%,#241a3a 0,transparent 30%),var(--bg);
+}
+.app{width:min(1100px,94vw);margin:auto;padding:22px 0 50px}
+header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
+h1{margin:0;font-size:clamp(1.6rem,4vw,2.5rem);letter-spacing:-.04em}
+.subtitle{color:var(--muted);margin-top:4px}
+button,select,input,textarea{font:inherit}
+button{
+  border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:12px;
+  padding:10px 14px;cursor:pointer;transition:.15s;
+}
+button:hover{background:var(--panel2);transform:translateY(-1px)}
+.today-btn{border-color:#526da9;background:#1a2640;white-space:nowrap}
+.picker{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:12px;
+  background:rgba(21,27,36,.92);border:1px solid var(--line);border-radius:22px;
+  margin-bottom:14px;
+}
+.wheel-wrap{position:relative;text-align:center}
+.wheel-label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.14em;margin-bottom:6px}
+.wheel{
+  position:relative;height:174px;overflow-y:auto;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;touch-action:pan-y;
+  border-radius:16px;background:linear-gradient(180deg,var(--panel2),#111720);
+  border:1px solid var(--line);padding:59px 0;
+}
+.wheel::-webkit-scrollbar{display:none}
+.wheel:before,.wheel:after{content:"";position:absolute;left:8px;right:8px;height:52px;pointer-events:none;z-index:2}
+.wheel:before{top:0;background:linear-gradient(var(--panel),transparent)}
+.wheel:after{bottom:0;background:linear-gradient(transparent,var(--panel))}
+.wheel-item{height:52px;display:flex;align-items:center;justify-content:center;color:#687586;font-size:1rem;user-select:none}
+.wheel-item.selected{color:var(--text);font-size:1.15rem;font-weight:750}
+.wheel-highlight{
+  position:absolute;left:8px;right:8px;top:80px;height:52px;border-top:2px solid #52617a;
+  border-bottom:2px solid #52617a;border-radius:10px;pointer-events:none;z-index:3;
+}
+#yearWheel .wheel-item{height:42px}
+#yearWheel{padding:66px 0}
+#yearWheel .wheel-highlight{top:80px}
+.selected-date{text-align:center;color:var(--muted);margin:0 0 12px}
+.selected-date strong{color:var(--text)}
+.view-switch{
+  display:flex;gap:5px;width:max-content;margin:0 auto 12px;padding:4px;
+  background:#111720;border:1px solid var(--line);border-radius:13px;
+}
+.view-btn{min-width:92px;padding:8px 14px;border:0;background:transparent;color:var(--muted);font-weight:750}
+.view-btn.active{background:#273b62;color:var(--text)}
+.calendar-card{background:rgba(21,27,36,.94);border:1px solid var(--line);border-radius:24px;padding:18px}
+.cal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.cal-title{text-align:center;flex:1}.cal-title h2{margin:0;font-size:clamp(1.4rem,4vw,2.1rem)}
+.cal-title p{margin:3px 0 0;color:var(--muted)}
+.week,.days{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.week div{text-align:center;color:var(--muted);font-size:.72rem;padding:7px 0}
+.day{
+  min-height:70px;border:1px solid var(--line);border-radius:11px;background:#121821;
+  padding:7px;position:relative;cursor:pointer;
+}
+.day:hover{background:#1a222e}.day.empty{background:transparent;border-color:transparent;cursor:default}
+.day-num{font-weight:700}.day.selected{outline:2px solid var(--accent);background:var(--today)}
+.day.holiday{background:var(--holiday)}
+.day.has-event{border-color:#45649e;background:#182844}
+.holiday-name,.calendar-event{
+  position:absolute;left:6px;right:5px;bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.62rem
+}
+.holiday-name{color:#d6b9ff}.calendar-event{bottom:20px;color:#c9d7ff}
+.legend{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:.78rem;margin-top:13px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;background:var(--holiday);border:1px solid #755a91}
+.year-view{display:none;margin-bottom:14px;padding:14px;background:#111720;border:1px solid var(--line);border-radius:18px}
+.year-view.open{display:block}
+.year-view-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.year-view-head h3{margin:0}
+.year-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.mini-month{border:1px solid var(--line);border-radius:13px;padding:9px;background:#141b25}
+.mini-month-title{font-weight:800;margin-bottom:7px}.mini-week,.mini-days{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.mini-week{margin-bottom:3px}.mini-week span{text-align:center;color:var(--muted);font-size:.58rem}
+.mini-day{min-height:25px;border:0;border-radius:5px;background:transparent;color:var(--text);font-size:.62rem;padding:2px;position:relative}
+.mini-day.note-day{background:#243653;box-shadow:inset 0 -2px 0 #7c9cff}
+.mini-day.today-day{outline:2px solid #7c9cff}.mini-day.holiday-day{background:#332744}
+.mini-day .note-dot{position:absolute;right:2px;bottom:2px;width:4px;height:4px;border-radius:50%;background:#c49aff}
+.year-note-list{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.year-note-item{display:flex;gap:9px;padding:7px 0;border-bottom:1px solid #222c3a}
+.year-note-date{min-width:72px;color:#aab6c8;font-size:.76rem}.year-note-text{font-weight:650}
+.countdowns-panel{margin-top:14px;padding:15px;background:#111720;border:1px solid var(--line);border-radius:18px}
+.countdowns-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.countdowns-head h3{margin:0}
+.countdowns-head span{color:var(--muted);font-size:.8rem}.countdown-list{display:grid;gap:9px;margin-top:10px}
+.countdown-card{position:relative;padding:13px;border-radius:14px;border:1px solid var(--card-color);background:linear-gradient(135deg,#17202c,#111720)}
+.countdown-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;border-radius:14px 0 0 14px;background:var(--card-color)}
+.countdown-title{font-weight:800;padding-right:30px}.countdown-target{color:var(--muted);font-size:.78rem;margin-top:2px}
+.countdown-time{display:flex;gap:8px;margin-top:10px}.countdown-unit{min-width:58px;text-align:center}
+.countdown-number{font-size:1.15rem;font-weight:800}.countdown-label{font-size:.62rem;color:var(--muted)}
+.delete-countdown{position:absolute;right:8px;top:8px;padding:3px 8px;border:0;background:transparent;color:#ffbdc6;font-size:1.2rem}
+.empty-countdowns{color:var(--muted);font-size:.86rem;padding:5px 0}
+.info{margin-top:14px;padding:13px 15px;background:#111720;border:1px solid var(--line);border-radius:16px;color:var(--muted)}
+.info strong{color:var(--text)}.info-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
+.info-action{border-radius:10px;padding:7px 10px;font-size:.82rem;background:#182236;border-color:#3c537c}
+.editor-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.66);z-index:90}
+.editor-backdrop.open{display:block}
+.event-panel{
+  display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(720px,92vw);max-height:90vh;overflow:auto;margin:0;padding:17px;
+  background:#111720;border:1px solid #3b4b63;border-radius:18px;z-index:100;
+  box-shadow:0 24px 80px rgba(0,0,0,.55)
+}
+.event-panel.open{display:block}.editor-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.editor-head h3{margin:0}.close-editor{width:42px;height:42px;padding:0;font-size:1.3rem}
+.date-note-list{display:grid;gap:8px;margin-top:10px}
+.date-note{
+  display:block;width:100%;text-align:left;padding:10px 12px;border:1px solid var(--line);
+  border-radius:12px;background:#151b24;color:var(--text)
+}
+.date-note-title{font-weight:750}.date-note-meta{color:var(--muted);font-size:.75rem;margin-top:2px}
+.add-note-btn{width:100%;margin-top:10px;border-color:#526da9;background:#1b2944;font-weight:750}
+.quick-add{margin:4px 0 13px}.quick-add-label{font-size:.76rem;color:var(--muted);margin-bottom:7px}
+.quick-add-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.quick-add-btn{min-height:40px;padding:7px 4px;font-size:.75rem;font-weight:700;background:#151d29}
+.quick-add-btn.active{border-color:#5577bd;background:#1b2944}
+.event-grid{display:grid;grid-template-columns:1fr 180px;gap:10px}
+.notes{width:100%;min-height:90px;resize:vertical;border:1px solid var(--line);border-radius:12px;background:#151b24;color:var(--text);padding:11px;outline:none}
+.repeat-select{width:100%;height:45px;border:1px solid var(--line);border-radius:12px;background:#151b24;color:var(--text);padding:0 9px}
+.event-actions{display:grid;grid-template-columns:1fr auto;gap:10px 14px;align-items:center;margin-top:13px}
+.age-toggle,.countdown-option{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.86rem}
+.age-toggle{grid-column:1/-1}.countdown-option{grid-column:1}
+.countdown-option input,.age-toggle input{width:18px;height:18px;accent-color:var(--accent)}
+.countdown-clock-btn{
+  grid-column:2;width:46px;height:46px;padding:0;display:grid;place-items:center;border-radius:12px;
+  border:1px solid #3a475a;background:#18202c;color:#667386;cursor:not-allowed;opacity:.55
+}
+.countdown-clock-btn.enabled{color:var(--accent);border-color:#5577bd;background:#1b2b49;cursor:pointer;opacity:1}
+.countdown-clock-btn svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.native-time-input{position:absolute;width:1px;height:1px;opacity:0}
+.event-bottom-actions{grid-column:1/-1;display:flex;gap:9px;align-items:center}
+.event-bottom-actions #clearEvent{margin-right:auto}
+.save-event{background:#24345c;border-color:#526da9;font-weight:750}
+.delete-note{background:#3a2028;border-color:#75404c;color:#ffdce2;font-weight:750}
+.delete-note:disabled{opacity:.35;cursor:not-allowed}
+.event-preview{margin-top:10px;color:var(--muted);font-size:.84rem}
+@media(max-width:700px){
+  .app{padding-top:15px}.header-actions{display:flex}.subtitle{font-size:.88rem}
+  .picker{gap:6px;padding:8px}.wheel{height:164px;padding:54px 0}.wheel-highlight{top:75px}
+  .wheel-item{height:52px;font-size:.9rem}.wheel-item.selected{font-size:1.08rem}
+  #yearWheel{padding:61px 0}#yearWheel .wheel-highlight{top:75px}
+  .calendar-card{padding:11px}.day{min-height:60px;padding:6px;font-size:.84rem}.holiday-name{font-size:.54rem}
+  .calendar-event{font-size:.54rem;bottom:18px}.year-grid{grid-template-columns:repeat(2,1fr)}
+  .event-grid{grid-template-columns:1fr}.event-panel{padding:14px}.quick-add-grid{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:460px){
+  .year-grid{grid-template-columns:1fr}.day{min-height:56px}.countdown-unit{min-width:52px}
+}
+</style>
 </head>
 <body>
-<div class="app">
-  <header>
-    <div>
-      <h1>Perpetual Calendar</h1>
-      <div class="subtitle">Explore dates from 1500 through 3000 and beyond.</div>
-    </div>
-    <button class="today-btn" id="todayBtn">Today</button>
-  </header>
+<div class="app" id="app">
+<header>
+  <div><h1>Perpetual Calendar</h1><div class="subtitle">Choose any date from 1500 through 3000</div></div>
+  <div class="header-actions"><button class="today-btn" id="todayBtn">Today</button></div>
+</header>
 
-  <section class="picker" aria-label="Date picker">
-    <div class="wheel-wrap">
-      <div class="wheel-label">Year</div>
-      <div class="wheel-highlight"></div>
-      <div class="wheel" id="yearWheel"></div>
-    </div>
-    <div class="wheel-wrap">
-      <div class="wheel-label">Month</div>
-      <div class="wheel-highlight"></div>
-      <div class="wheel" id="monthWheel"></div>
-    </div>
-    <div class="wheel-wrap">
-      <div class="wheel-label">Day</div>
-      <div class="wheel-highlight"></div>
-      <div class="wheel" id="dayWheel"></div>
-    </div>
-  </section>
+<section class="picker" aria-label="Date picker">
+  <div class="wheel-wrap"><div class="wheel-label">Year</div><div class="wheel" id="yearWheel"></div><div class="wheel-highlight"></div></div>
+  <div class="wheel-wrap"><div class="wheel-label">Month</div><div class="wheel" id="monthWheel"></div><div class="wheel-highlight"></div></div>
+  <div class="wheel-wrap"><div class="wheel-label">Day</div><div class="wheel" id="dayWheel"></div><div class="wheel-highlight"></div></div>
+</section>
 
-  <div class="view-switch" role="group" aria-label="Calendar view">
-    <button type="button" class="view-btn active" id="monthViewBtn">Month</button>
-    <button type="button" class="view-btn" id="yearViewBtn">Year</button>
+<p class="selected-date" id="selectedDate"></p>
+
+<div class="view-switch" aria-label="Calendar view">
+  <button class="view-btn active" id="monthViewBtn" type="button">Month</button>
+  <button class="view-btn" id="yearViewBtn" type="button">Year</button>
+</div>
+
+<section class="year-view" id="yearView">
+  <div class="year-view-head"><h3 id="yearViewTitle"></h3><button type="button" id="yearTodayBtn">Today</button></div>
+  <div class="year-grid" id="yearGrid"></div>
+  <div class="year-note-list" id="yearNoteList"></div>
+</section>
+
+<section class="calendar-card calendar-focus-target" id="calendarCard">
+  <div class="cal-head">
+    <button type="button" id="prevMonth" aria-label="Previous month">‹</button>
+    <div class="cal-title"><h2 id="calTitle"></h2><p id="calSubtitle"></p></div>
+    <button type="button" id="nextMonth" aria-label="Next month">›</button>
+  </div>
+  <div class="week" id="week"></div>
+  <div class="days" id="days"></div>
+  <div class="legend"><span><i class="dot"></i>Holiday / observance</span><span>Tap any date for notes</span></div>
+</section>
+
+<section class="info" id="dateInfo"></section>
+
+<section class="countdowns-panel" aria-label="Countdown Clocks">
+  <div class="countdowns-head"><h3>Countdown Clocks</h3><span id="countdownCount"></span></div>
+  <div class="countdown-list" id="countdownList"></div>
+</section>
+</div>
+
+<div class="editor-backdrop" id="editorBackdrop"></div>
+<section class="event-panel" id="eventEditor" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+  <div class="editor-head"><h3 id="editorTitle">Notes for this date</h3><button class="close-editor" id="closeEditor" type="button" aria-label="Close">×</button></div>
+
+  <div id="dateNoteArea">
+    <div class="date-note-list" id="dateNoteList"></div>
+    <button class="add-note-btn" id="addNoteBtn" type="button">＋ Add note</button>
   </div>
 
-  <section class="year-view calendar-focus-target" id="yearView" aria-label="Year view">
-    <div class="year-view-head">
-      <button type="button" id="yearPrev" aria-label="Previous year">‹</button>
-      <h3 id="yearViewTitle"></h3>
-      <button type="button" id="yearNext" aria-label="Next year">›</button>
+  <div id="noteForm" style="display:none">
+    <div class="quick-add">
+      <div class="quick-add-label">Category</div>
+      <div class="quick-add-grid">
+        <button class="quick-add-btn" type="button" data-quick="birthday">Birthday</button>
+        <button class="quick-add-btn" type="button" data-quick="anniversary">Anniversary</button>
+        <button class="quick-add-btn" type="button" data-quick="trip">Trip</button>
+        <button class="quick-add-btn" type="button" data-quick="retirement">Retirement</button>
+        <button class="quick-add-btn" type="button" data-quick="custom">Custom</button>
+        <span></span>
+      </div>
     </div>
-    <div class="year-grid" id="yearGrid"></div>
-    <div class="year-note-list" id="yearNoteList"></div>
-  </section>
 
-  <section class="calendar-card calendar-focus-target" id="monthView">
-    <div class="cal-head">
-      <button id="prevMonth" aria-label="Previous month">‹</button>
-      <div class="cal-title">
-        <h2 id="monthTitle"></h2>
-        <p id="dateDescription"></p>
-      </div>
-      <button id="nextMonth" aria-label="Next month">›</button>
+    <div class="event-grid">
+      <textarea class="notes" id="noteInput" placeholder="Enter your note"></textarea>
+      <select class="repeat-select" id="repeatSelect" aria-label="Repeat">
+        <option value="none">Does not repeat</option>
+        <option value="daily">Every day</option>
+        <option value="weekly">Every week</option>
+        <option value="monthly">Every month</option>
+        <option value="yearly">Every year</option>
+      </select>
     </div>
-    <div class="week" id="week"></div>
-    <div class="days" id="days"></div>
-    <div class="legend"><span><span class="dot"></span>Holiday / observance</span></div>
-    <div class="info" id="info"></div>
 
-    <div class="editor-backdrop" id="editorBackdrop"></div>
-    <div class="event-panel modal-editor" id="eventEditor">
-      <div class="editor-head">
-        <h3>Notes &amp; Repeat</h3>
-        <button class="close-editor" id="closeEditor" aria-label="Close notes">×</button>
+    <div class="event-actions">
+      <label class="age-toggle"><input type="checkbox" id="ageToggle"> Track age / years for yearly birthday or anniversary</label>
+      <label class="countdown-option"><input type="checkbox" id="countdownToggle"> Add countdown clock</label>
+      <button class="countdown-clock-btn" id="countdownClockButton" type="button" disabled aria-label="Set countdown time" title="Select Add countdown clock first">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5l3.5 2"></path></svg>
+      </button>
+      <input class="native-time-input" id="countdownTime" type="time" value="00:00" aria-label="Countdown time">
+      <div class="event-bottom-actions">
+        <button type="button" id="clearEvent">Exit</button>
+        <button type="button" class="delete-note" id="deleteNote" disabled>Delete</button>
+        <button type="button" class="save-event" id="saveEvent">Save note</button>
       </div>
-      <div class="quick-add">
-        <div class="quick-add-label">Quick Add</div>
-        <div class="quick-add-grid">
-          <button type="button" class="quick-add-btn" data-quick="birthday">🎂 Birthday</button>
-          <button type="button" class="quick-add-btn" data-quick="anniversary">💍 Anniversary</button>
-          <button type="button" class="quick-add-btn" data-quick="trip">✈️ Trip</button>
-          <button type="button" class="quick-add-btn" data-quick="retirement">💼 Retirement</button>
-          <button type="button" class="quick-add-btn" data-quick="custom">📌 Custom</button>
-        </div>
-      </div>
-      <div class="auto-color-legend" aria-label="Automatic event colors">
-        <span><i style="background:#4f8cff"></i>Birthday</span>
-        <span><i style="background:#e85d68"></i>Anniversary</span>
-        <span><i style="background:#4fbf7a"></i>Trip</span>
-        <span><i style="background:#e4b84d"></i>Retirement</span>
-        <span><i style="background:#f29a3f"></i>Other</span>
-      </div>
-      <div class="event-grid">
-        <textarea class="notes" id="noteInput" placeholder="Write a note for this date…"></textarea>
-        <select class="repeat-select" id="repeatSelect" aria-label="Repeat">
-          <option value="none">Does not repeat</option>
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
-          <option value="yearly">Yearly</option>
-        </select>
-      </div>
-      <div class="event-actions">
-        <label class="age-toggle"><input type="checkbox" id="ageToggle"> Track age on yearly repeats</label>
-        <label class="countdown-option"><input type="checkbox" id="countdownToggle"> Add countdown clock</label>
-        <button type="button" class="countdown-clock-btn" id="countdownClockButton" disabled aria-label="Set countdown time" title="Select Add countdown clock first">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5l3.5 2"></path></svg>
-          <span class="sr-only">Set countdown time</span>
-        </button>
-        <input id="countdownTime" class="native-time-input" type="time" value="00:00" aria-label="Countdown start time">
-        <div class="event-bottom-actions">
-          <button type="button" id="clearEvent">Clear</button>
-          <button type="button" class="save-event" id="saveEvent">Save note</button>
-        </div>
-      </div>
-      <div class="event-previewdiv class="event-preview" id="eventPreview"></div>
     </div>
-    <section class="countdowns-panel" aria-label="Countdown Clocks">
-      <div class="countdowns-head"><h3>Countdown Clocks</h3><span id="countdownCount"></span></div>
-      <div class="countdown-list" id="countdownList"></div>
-    </section>
-  </section>
-</div>
+    <div class="event-preview" id="eventPreview"></div>
+  </div>
+</section>
 
 <script>
 (() => {
-  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-  const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  "use strict";
 
-  // Built-in U.S. holiday rules. The calendar engine itself is perpetual;
-  // holiday rules can be expanded or replaced with a historical holiday database.
-  const fixedHolidays = {
-    "1-1":"New Year's Day","2-14":"Valentine's Day","7-4":"Independence Day",
-    "10-31":"Halloween","12-25":"Christmas Day"
-  };
+  const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const WEEKDAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const YEAR_MIN=1500, YEAR_MAX=3000, WHEEL_CYCLES=9, MID=Math.floor(WHEEL_CYCLES/2);
+  const EVENT_KEY="perpetualCalendarEvents_v2", COUNTDOWN_KEY="perpetualCalendarCountdowns_v2";
+  const COLORS={birthday:"#4f8cff",anniversary:"#e85d68",trip:"#4fbf7a",retirement:"#e4b84d",custom:"#f29a3f"};
 
-  function nthWeekday(year, month, weekday, n){
-    const first = new Date(year, month-1, 1).getDay();
-    return 1 + ((weekday - first + 7) % 7) + (n-1)*7;
+  const fixedHolidays={"1-1":"New Year's Day","2-14":"Valentine's Day","7-4":"Independence Day","10-31":"Halloween","12-25":"Christmas Day"};
+  const $=id=>document.getElementById(id);
+
+  const now=new Date(); now.setHours(12,0,0,0);
+  const state={year:now.getFullYear(),month:now.getMonth(),day:now.getDate()};
+  let calendarView="month", editingId=null, selectedType="custom";
+
+  function daysInMonth(y,m){return new Date(y,m+1,0).getDate()}
+  function dateObj(y,m,d,h=12,min=0){return new Date(y,m,d,h,min,0,0)}
+  function iso(y,m,d){return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`}
+  function esc(v){return String(v??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]))}
+  function loadEvents(){try{return JSON.parse(localStorage.getItem(EVENT_KEY)||"[]")}catch{return[]}}
+  function saveEvents(a){localStorage.setItem(EVENT_KEY,JSON.stringify(a))}
+  function loadCountdowns(){try{return JSON.parse(localStorage.getItem(COUNTDOWN_KEY)||"[]")}catch{return[]}}
+  function saveCountdowns(a){localStorage.setItem(COUNTDOWN_KEY,JSON.stringify(a))}
+  function eventColor(type){return COLORS[type]||COLORS.custom}
+  function eventMatches(ev,y,m,d){
+    const base=dateObj(ev.y,ev.m,ev.d),cur=dateObj(y,m,d),diff=Math.round((Date.UTC(y,m,d)-Date.UTC(ev.y,ev.m,ev.d))/86400000);
+    if(diff<0)return false;
+    if(ev.repeat==="none")return diff===0;
+    if(ev.repeat==="daily")return true;
+    if(ev.repeat==="weekly")return diff%7===0;
+    if(ev.repeat==="monthly")return d===ev.d;
+    if(ev.repeat==="yearly")return m===ev.m&&d===ev.d;
+    return iso(ev.y,ev.m,ev.d)===iso(y,m,d);
   }
-  function lastWeekday(year, month, weekday){
-    const last = new Date(year, month, 0).getDate();
-    const d = new Date(year, month-1, last).getDay();
-    return last - ((d-weekday+7)%7);
+  function eventsFor(y,m,d){return loadEvents().filter(e=>eventMatches(e,y,m,d))}
+  function eventLabel(ev,y){
+    let text=ev.note||"Note";
+    if(ev.repeat==="yearly"&&ev.age){
+      const age=y-ev.y;
+      if(age>=0) text+=` · ${age} year${age===1?"":"s"}`;
+    }
+    return text;
   }
-  function easterSunday(year){
-    // Gregorian computus
-    const a=year%19,b=Math.floor(year/100),c=year%100,d=Math.floor(b/4),e=b%4;
-    const f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30;
-    const i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7;
-    const m=Math.floor((a+11*h+22*l)/451);
-    const month=Math.floor((h+l-7*m+114)/31), day=((h+l-7*m+114)%31)+1;
-    return {month,day};
+  function nthWeekday(year,month,weekday,n){const first=new Date(year,month-1,1).getDay();return 1+((weekday-first+7)%7)+(n-1)*7}
+  function lastWeekday(year,month,weekday){const last=new Date(year,month,0).getDate();const d=new Date(year,month-1,last).getDay();return last-((d-weekday+7)%7)}
+  function easter(year){
+    const a=year%19,b=Math.floor(year/100),c=year%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),month=Math.floor((h+l-7*m+114)/31),day=((h+l-7*m+114)%31)+1;
+    return{month,day};
   }
-  function holidays(year, month){
-    const out = {};
-    const add=(m,d,name)=>{ if(m===month) out[d]=name; };
-    Object.entries(fixedHolidays).forEach(([key,name])=>{
-      const [m,d]=key.split("-").map(Number); add(m,d,name);
-    });
-    if(month===1) add(1,nthWeekday(year,1,1,3),"Martin Luther King Jr. Day");
-    if(month===2) add(2,nthWeekday(year,2,1,3),"Presidents' Day");
-    if(month===5) add(5,lastWeekday(year,5,1),"Memorial Day");
-    if(month===6) add(6,nthWeekday(year,6,0,3),"Father's Day");
-    if(month===9) add(9,nthWeekday(year,9,1,1),"Labor Day");
-    if(month===11) add(11,nthWeekday(year,11,4,4),"Thanksgiving Day");
-    const easter=easterSunday(year);
-    if(easter.month===month) add(month,easter.day,"Easter Sunday");
+  function holidays(y,m){
+    const out={};
+    const add=(mm,d,n)=>{if(mm===m)out[d]=n};
+    Object.entries(fixedHolidays).forEach(([k,n])=>{const [mm,d]=k.split("-").map(Number);add(mm,d,n)});
+    if(m===0)add(0,nthWeekday(y,1,1,3),"Martin Luther King Jr. Day");
+    if(m===1)add(1,nthWeekday(y,2,1,3),"Presidents' Day");
+    if(m===4)add(4,lastWeekday(y,5,1),"Memorial Day");
+    if(m===5)add(5,nthWeekday(y,6,0,3),"Father's Day");
+    if(m===8)add(8,nthWeekday(y,9,1,1),"Labor Day");
+    if(m===10)add(10,nthWeekday(y,11,4,4),"Thanksgiving Day");
+    const e=easter(y); if(e.month-1===m)add(m,e.day,"Easter Sunday");
     return out;
   }
 
-  let selected = new Date();
-  selected.setHours(12,0,0,0);
-  const state = {year:selected.getFullYear(), month:selected.getMonth(), day:selected.getDate()};
-
-  const yearWheel=document.getElementById("yearWheel");
-  const monthWheel=document.getElementById("monthWheel");
-  const dayWheel=document.getElementById("dayWheel");
-
-  function daysInMonth(y,m){ return new Date(y,m+1,0).getDate(); }
-
-  const WHEEL_CYCLES = 9;
-  const WHEEL_CENTER_CYCLE = Math.floor(WHEEL_CYCLES/2);
-  const YEAR_MIN = 1500, YEAR_MAX = 3000;
-
-  function centerIndex(el,index,behavior="smooth"){
-    const item=el.children[index];
-    if(!item) return;
-    const target=item.offsetTop-(el.clientHeight-item.offsetHeight)/2;
-    el.scrollTo({top:Math.max(0,target),behavior});
-  }
-
   function centeredIndex(el){
-    const first=el.children[0];
-    if(!first) return 0;
-    const row=first.offsetHeight || 52;
-    const center=el.scrollTop+el.clientHeight/2;
+    if(!el.children.length)return 0;
+    const first=el.children[0], row=first.offsetHeight||52, center=el.scrollTop+el.clientHeight/2;
     return Math.max(0,Math.min(el.children.length-1,Math.round((center-first.offsetTop-row/2)/row)));
   }
-
-  function makeWheel(el,values,selectedIndex,formatter,onSelect,opts={}){
+  function centerIndex(el,index,behavior="smooth"){
+    const item=el.children[index]; if(!item)return;
+    el.scrollTo({top:Math.max(0,item.offsetTop-(el.clientHeight-item.offsetHeight)/2),behavior});
+  }
+  function updateSelected(el){
+    const idx=centeredIndex(el);
+    for(let i=Math.max(0,idx-3);i<=Math.min(el.children.length-1,idx+3);i++)el.children[i].classList.toggle("selected",i===idx);
+  }
+  function makeWheel(el,values,selectedIndex,formatter,onSelect,circular=false){
     el.innerHTML="";
-    const base=values.length;
-    const circular=!!opts.circular;
-    const renderValues=circular ? Array.from({length:base*WHEEL_CYCLES},(_,i)=>values[i%base]) : values;
-    renderValues.forEach((value,i)=>{
-      const item=document.createElement("div");
-      item.className="wheel-item";
-      item.textContent=formatter(value);
-      item.dataset.index=i;
-      item.addEventListener("click",()=>centerIndex(el,i,"smooth"));
+    const base=values.length, arr=circular?Array.from({length:base*WHEEL_CYCLES},(_,i)=>values[i%base]):values;
+    arr.forEach((v,i)=>{
+      const item=document.createElement("div");item.className="wheel-item";item.textContent=formatter(v);item.dataset.i=i;
+      item.addEventListener("click",()=>centerIndex(el,i));
       el.appendChild(item);
     });
-
-    const initialIndex=circular ? WHEEL_CENTER_CYCLE*base+selectedIndex : selectedIndex;
-    requestAnimationFrame(()=>{centerIndex(el,initialIndex,"auto");updateSelected(el);});
-
-    let timer;
+    requestAnimationFrame(()=>{const idx=circular?MID*base+selectedIndex:selectedIndex;centerIndex(el,idx,"auto");updateSelected(el)});
+    clearTimeout(el._timer);
     el.onscroll=()=>{
-      updateSelected(el);
-      clearTimeout(timer);
-      timer=setTimeout(()=>{
-        let index=centeredIndex(el);
+      updateSelected(el);clearTimeout(el._timer);
+      el._timer=setTimeout(()=>{
+        let idx=centeredIndex(el);
         if(circular){
-          const logical=((index%base)+base)%base;
-          onSelect(values[logical]);
-          const cycle=Math.floor(index/base);
-          if(cycle<=1 || cycle>=WHEEL_CYCLES-2){
-            const middle=WHEEL_CENTER_CYCLE*base+logical;
-            centerIndex(el,middle,"auto");
-            index=middle;
-          }
-        }else{
-          onSelect(values[index]);
-        }
-        centerIndex(el,index,"smooth");
+          const logical=((idx%base)+base)%base;onSelect(values[logical]);
+          const cycle=Math.floor(idx/base);
+          if(cycle<=1||cycle>=WHEEL_CYCLES-2){idx=MID*base+logical;centerIndex(el,idx,"auto")}
+        }else onSelect(values[idx]);
         updateSelected(el);
-      },180);
+      },140);
     };
-  }
-
-  function updateSelected(el){
-    const index=centeredIndex(el);
-    const lo=Math.max(0,index-3), hi=Math.min(el.children.length-1,index+3);
-    for(let i=lo;i<=hi;i++) el.children[i].classList.toggle("selected",i===index);
   }
 
   function rebuildWheels(){
-    const maxDay=daysInMonth(state.year,state.month);
-    if(state.day>maxDay) state.day=maxDay;
+    const max=daysInMonth(state.year,state.month);if(state.day>max)state.day=max;
     const years=Array.from({length:YEAR_MAX-YEAR_MIN+1},(_,i)=>YEAR_MIN+i);
-    makeWheel(yearWheel,years,state.year-YEAR_MIN,String,y=>{
-      state.year=y;
-      const max=daysInMonth(state.year,state.month);
-      if(state.day>max) state.day=max;
-      render();
-      rebuildDayWheel();
-    });
-    makeWheel(monthWheel,MONTHS,state.month,m=>m,m=>{
-      state.month=MONTHS.indexOf(m);
-      const max=daysInMonth(state.year,state.month);
-      if(state.day>max) state.day=max;
-      render();
-      rebuildDayWheel();
-    },{circular:true});
+    makeWheel($("yearWheel"),years,state.year-YEAR_MIN,String,y=>{state.year=y;state.day=Math.min(state.day,daysInMonth(state.year,state.month));renderAll();rebuildDayWheel();},false);
+    makeWheel($("monthWheel"),MONTHS,state.month,v=>{state.month=MONTHS.indexOf(v);state.day=Math.min(state.day,daysInMonth(state.year,state.month));renderAll();rebuildDayWheel();},true);
     rebuildDayWheel();
   }
-
   function rebuildDayWheel(){
-    const max=daysInMonth(state.year,state.month);
-    if(state.day>max) state.day=max;
-    const days=Array.from({length:max},(_,i)=>i+1);
-    makeWheel(dayWheel,days,state.day-1,String,d=>{state.day=d;render();},{circular:true});
+    const max=daysInMonth(state.year,state.month),days=Array.from({length:max},(_,i)=>i+1);
+    makeWheel($("dayWheel"),days,state.day-1,String,d=>{state.day=d;renderAll();scrollToCalendar()},true);
   }
 
-
-  const EVENT_KEY="perpetualCalendarEvents_v1";
-  const COUNTDOWN_KEY="perpetualCalendarCountdowns_v1";
-  function loadEvents(){try{return JSON.parse(localStorage.getItem(EVENT_KEY)||"[]")}catch{return []}}
-  function saveEvents(list){localStorage.setItem(EVENT_KEY,JSON.stringify(list))}
-  function loadCountdowns(){try{return JSON.parse(localStorage.getItem(COUNTDOWN_KEY)||"[]")}catch{return []}}
-  function saveCountdowns(list){localStorage.setItem(COUNTDOWN_KEY,JSON.stringify(list))}
-  function iso(y,m,d){return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`}
-  function daysBetween(a,b){return Math.round((Date.UTC(b.getFullYear(),b.getMonth(),b.getDate())-Date.UTC(a.getFullYear(),a.getMonth(),a.getDate()))/86400000)}
-  function eventMatches(ev,y,m,d){const base=new Date(ev.y,ev.m,ev.d),cur=new Date(y,m,d),diff=daysBetween(base,cur);if(diff<0)return false;if(ev.repeat==="none")return diff===0;if(ev.repeat==="daily")return true;if(ev.repeat==="weekly")return diff%7===0;if(ev.repeat==="monthly")return d===ev.d&&(y*12+m)-(ev.y*12+ev.m)>=0;if(ev.repeat==="yearly")return m===ev.m&&d===ev.d;return false}
-  function eventsFor(y,m,d){return loadEvents().filter(ev=>eventMatches(ev,y,m,d))}
-  function eventColor(ev){
-    const type=ev?.type||"custom";
-    return {
-      birthday:"#4f8cff",   // blue
-      anniversary:"#e85d68",// red
-      trip:"#4fbf7a",       // green
-      retirement:"#e4b84d", // yellow
-      custom:"#f29a3f"      // orange
-    }[type] || "#f29a3f";
-  }
-
-  function eventLabel(ev,y){let text=ev.note||"Note";if(ev.repeat==="yearly"&&ev.age){const age=y-ev.y;if(age>=0)text+=` · ${age} year${age===1?"":"s"}`}return text}
-  function localTarget(c){const [hh,mm]=(c.time||"00:00").split(":").map(Number);return new Date(c.y,c.m,c.d,hh||0,mm||0,0,0)}
-  function esc(v){return String(v).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]))}
-  function renderCountdowns(){
-    const listEl=document.getElementById("countdownList"),countEl=document.getElementById("countdownCount");
-    const now=new Date(), active=loadCountdowns().filter(c=>localTarget(c)>now).sort((a,b)=>localTarget(a)-localTarget(b));
-    countEl.textContent=`${active.length} active`;
-    if(!active.length){listEl.innerHTML='<div class="empty-countdowns">No active countdown clocks yet. Pick a future date, add a note, and turn on “Add countdown clock.”</div>';return}
-    listEl.innerHTML=active.map(c=>{let ms=localTarget(c)-now;const days=Math.floor(ms/86400000);ms%=86400000;const hours=Math.floor(ms/3600000);ms%=3600000;const mins=Math.floor(ms/60000);ms%=60000;const secs=Math.floor(ms/1000);const target=localTarget(c).toLocaleString(undefined,{month:"long",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"});return `<article class="countdown-card" style="--card-color:${c.color||"#7c9cff"}"><button class="delete-countdown" data-countdown-id="${c.id}" title="Delete countdown" aria-label="Delete countdown">×</button><div class="countdown-title">${esc(c.title||"Countdown")}</div><div class="countdown-target">Until ${target}</div><div class="countdown-time"><div class="countdown-unit"><div class="countdown-number">${String(days).padStart(2,"0")}</div><div class="countdown-label">Days</div></div><div class="countdown-unit"><div class="countdown-number">${String(hours).padStart(2,"0")}</div><div class="countdown-label">Hours</div></div><div class="countdown-unit"><div class="countdown-number">${String(mins).padStart(2,"0")}</div><div class="countdown-label">Min</div></div><div class="countdown-unit"><div class="countdown-number">${String(secs).padStart(2,"0")}</div><div class="countdown-label">Sec</div></div></div></article>`}).join("");
-    document.querySelectorAll(".delete-countdown").forEach(btn=>btn.onclick=()=>{saveCountdowns(loadCountdowns().filter(c=>String(c.id)!==String(btn.dataset.countdownId)));renderCountdowns()});
-  }
-  function refreshEventEditor(){
-    const key=iso(state.year,state.month,state.day),ev=loadEvents().find(x=>iso(x.y,x.m,x.d)===key),c=loadCountdowns().find(x=>x.y===state.year&&x.m===state.month&&x.d===state.day);
-    document.getElementById("noteInput").value=ev?.note||"";document.getElementById("repeatSelect").value=ev?.repeat||"none";document.getElementById("ageToggle").checked=!!ev?.age;
-    document.getElementById("deleteNote").disabled=!ev;
-    document.getElementById("countdownToggle").checked=!!c;document.getElementById("countdownTime").value=c?.time||"00:00";updateCountdownFields();
-    let p=ev?`Saved note: ${ev.repeat}${ev.age?" · age tracking":""}`:"No saved note for this date.";if(c)p+=` · Countdown: ${c.title||ev?.note||"Untitled"}`;document.getElementById("eventPreview").textContent=p;
-  }
-  function updateCountdownFields(){
-    const on=document.getElementById("countdownToggle").checked;
-    const btn=document.getElementById("countdownClockButton");
-    if(btn){
-      btn.disabled=!on;
-      btn.classList.toggle("enabled",on);
-      btn.title=on?"Set countdown time":"Select Add countdown clock first";
-      btn.setAttribute("aria-disabled",String(!on));
+  function renderCalendar(){
+    const y=state.year,m=state.month,h=holidays(y,m);
+    $("calTitle").textContent=`${MONTHS[m]} ${y}`;
+    $("calSubtitle").textContent=`Selected day: ${state.day}`;
+    $("week").innerHTML=WEEKDAYS.map(d=>`<div>${d.slice(0,3)}</div>`).join("");
+    const first=new Date(y,m,1).getDay(),count=daysInMonth(y,m),cells=[];
+    for(let i=0;i<first;i++)cells.push(`<div class="day empty"></div>`);
+    for(let d=1;d<=count;d++){
+      const evs=eventsFor(y,m,d),holiday=h[d];
+      const cls=["day"];if(d===state.day)cls.push("selected");if(holiday)cls.push("holiday");if(evs.length)cls.push("has-event");
+      const label=evs[0]?eventLabel(evs[0],y):"";
+      cells.push(`<button type="button" class="${cls.join(" ")}" data-day="${d}" style="${evs[0]?`--event-color:${eventColor(evs[0].type)}`:""}"><span class="day-num">${d}</span>${label?`<span class="calendar-event">${esc(label)}</span>`:""}${holiday?`<span class="holiday-name">${esc(holiday)}</span>`:""}</button>`);
     }
-  }
-  function openEditor(edit=false, noteId=null){
-    window.__editingNoteId = edit ? noteId : null;
-
-    const panel=document.getElementById("eventEditor"),back=document.getElementById("editorBackdrop");
-    panel.classList.add("open");back.classList.add("open");
-    refreshEventEditor();
-    if(edit && noteId!==null){
-      const target=eventsFor(state.year,state.month,state.day).find(x=>Number(x.id)===Number(noteId));
-      if(target){
-        document.getElementById("noteInput").value=target.note||"";
-        document.getElementById("repeatSelect").value=target.repeat||"none";
-        document.getElementById("ageToggle").checked=!!target.age;
-        document.querySelectorAll(".quick-add-btn").forEach(b=>b.classList.toggle("active",b.dataset.quick===target.type));
-        if(document.getElementById("countdownToggle")){
-          const c=(typeof countdownsFor==="function"?countdownsFor(state.year,state.month,state.day):[]).find(x=>Number(x.eventId)===Number(target.id)) || loadCountdowns().find(x=>x.y===state.year&&x.m===state.month&&x.d===state.day);
-          document.getElementById("countdownToggle").checked=!!c;
-          if(document.getElementById("countdownTime")) document.getElementById("countdownTime").value=c?.time||"00:00";
-          updateCountdownFields();
-        }
-      }
-    }
-
-    if(!edit){
-      document.getElementById("noteInput").value="";
-      document.getElementById("repeatSelect").value="none";
-      document.getElementById("ageToggle").checked=false;
-      document.getElementById("countdownToggle").checked=false;
-      document.getElementById("countdownTime").value="00:00";
-      updateCountdownFields();
-      document.getElementById("eventPreview").textContent="Add a note for this date.";
-    }
-    setTimeout(()=>document.getElementById("noteInput").focus(),80);
-  }
-  function closeEditor(){
-    document.getElementById("eventEditor").classList.remove("open");
-    document.getElementById("editorBackdrop").classList.remove("open");
-  }
-  function wireEvents(){
-    document.getElementById("monthViewBtn").onclick=()=>setCalendarView("month");
-    document.getElementById("yearViewBtn").onclick=()=>setCalendarView("year");
-    document.getElementById("yearPrev").onclick=()=>{state.year--; rebuildWheels(); render();};
-    document.getElementById("yearNext").onclick=()=>{state.year++; rebuildWheels(); render();};
-
-    document.querySelectorAll(".quick-add-btn").forEach(btn=>{
-      btn.onclick=()=>{
-        const type=btn.dataset.quick;
-        const note=document.getElementById("noteInput");
-        const repeat=document.getElementById("repeatSelect");
-        const age=document.getElementById("ageToggle");
-        const countdown=document.getElementById("countdownToggle");
-        const title=document.getElementById("countdownTitle");
-        const presets={
-          birthday:{text:"Birthday",repeat:"yearly",age:true,countdown:false},
-          anniversary:{text:"Anniversary",repeat:"yearly",age:true,countdown:false},
-          trip:{text:"Trip",repeat:"none",age:false,countdown:false},
-          retirement:{text:"Retirement",repeat:"none",age:false,countdown:false},
-          custom:{text:"",repeat:"none",age:false,countdown:false}
-        };
-        const preset=presets[type];
-        if(!preset) return;
-        if(preset.text) note.value=preset.text;
-        repeat.value=preset.repeat;
-        age.checked=preset.age;
-        countdown.checked=preset.countdown;
-        updateCountdownFields();
-        document.getElementById("eventPreview").textContent=`Quick Add: ${preset.text || "Custom"}`;
-        note.focus();
-      };
-    });
-    document.getElementById("closeEditor").onclick=closeEditor;
-    document.getElementById("editorBackdrop").onclick=closeEditor;
-    document.addEventListener("keydown",e=>{if(e.key==="Escape")closeEditor()});
-    document.getElementById("countdownToggle").onchange=()=>{
-      updateCountdownFields();
-      if(document.getElementById("countdownToggle").checked){
-        document.getElementById("countdownClockButton").focus();
-      }
-    };
-    document.getElementById("countdownClockButton").onclick=()=>{
-      if(document.getElementById("countdownClockButton").disabled) return;
-      const input=document.getElementById("countdownTime");
-      try{
-        if(typeof input.showPicker==="function") input.showPicker();
-        else input.click();
-      }catch(e){ input.click(); }
-    };
-    document.getElementById("saveEvent").onclick=()=>{
-      const note=document.getElementById("noteInput").value.trim(),repeat=document.getElementById("repeatSelect").value,age=document.getElementById("ageToggle").checked&&repeat==="yearly",on=document.getElementById("countdownToggle").checked,key=iso(state.year,state.month,state.day);
-      const note=document.getElementById("noteInput").value.trim(),repeat=document.getElementById("repeatSelect").value,age=document.getElementById("ageToggle").checked&&repeat==="yearly",on=document.getElementById("countdownToggle").checked,key=iso(state.year,state.month,state.day);
-      const existingEdited=window.__editingNoteId
-        ? loadEvents().find(x=>Number(x.id)===Number(window.__editingNoteId))
-        : null;
-      const selectedType=document.querySelector(".quick-add-btn.active")?.dataset.quick || existingEdited?.type || "custom";
-      const events=loadEvents().filter(x=>existingEdited ? Number(x.id)!==Number(existingEdited.id) : iso(x.y,x.m,x.d)!==key);
-      if(note) events.push({id:existingEdited?.id||Date.now(),y:state.year,m:state.month,d:state.day,note,repeat,age,type:selectedType});saveEvents(events);
-      let cs=loadCountdowns().filter(c=>!(c.y===state.year&&c.m===state.month&&c.d===state.day));
-      if(on){const time=document.getElementById("countdownTime").value||"00:00",[hh,mm]=time.split(":").map(Number),target=new Date(state.year,state.month,state.day,hh,mm,0,0);if(target<=new Date()){alert("A countdown clock needs a future date and time. Please choose a future date.");render();return}cs.push({id:Date.now(),eventId:existingEdited?.id||null,y:state.year,m:state.month,d:state.day,time,title:note||"Countdown",color:eventColor({type:selectedType})})}
-      saveCountdowns(cs);render();refreshEventEditor();renderCountdowns();closeEditor();
-    };
-saveEvents(loadEvents().filter(x=>iso(x.y,x.m,x.d)!==key));
-      document.getElementById("noteInput").value="";
-      document.getElementById("repeatSelect").value="none";
-      document.getElementById("ageToggle").checked=false;
-      render();refreshEventEditor();renderCountdowns();closeEditor();
-    };
-    document.getElementById("clearEvent").onclick=()=>{const key=iso(state.year,state.month,state.day);saveEvents(loadEvents().filter(x=>iso(x.y,x.m,x.d)!==key));saveCountdowns(loadCountdowns().filter(c=>!(c.y===state.year&&c.m===state.month&&c.d===state.day)));render();refreshEventEditor();renderCountdowns();closeEditor()};
+    $("days").innerHTML=cells.join("");
+    $("days").querySelectorAll("[data-day]").forEach(btn=>btn.addEventListener("click",()=>{state.day=Number(btn.dataset.day);renderAll();openDateNotes();scrollToCalendar()}));
   }
 
-
-  let calendarView="month";
+  function renderInfo(){
+    const h=holidays(state.year,state.month)[state.day],evs=eventsFor(state.year,state.month,state.day);
+    const date=dateObj(state.year,state.month,state.day);
+    let text=`<strong>${date.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"})}</strong>`;
+    if(h)text+=` · ${esc(h)}`;
+    $("dateInfo").innerHTML=`${text}<div class="info-actions"><button class="info-action plus" id="infoNotes">Notes${evs.length?` (${evs.length})`:""}</button><button class="info-action" id="infoAdd">＋ Add note</button></div>`;
+    $("infoNotes").onclick=openDateNotes;$("infoAdd").onclick=()=>openEditor(false);
+  }
 
   function renderYearView(){
-    const grid=document.getElementById("yearGrid");
-    const list=document.getElementById("yearNoteList");
-    const y=state.year;
-    document.getElementById("yearViewTitle").textContent=String(y);
-    const weekNames=["S","M","T","W","T","F","S"];
-    const items=[];
-    grid.innerHTML=MONTHS.map((name,m)=>{
-      const first=new Date(y,m,1).getDay();
-      const count=new Date(y,m+1,0).getDate();
+    const y=state.year; $("yearViewTitle").textContent=String(y);
+    const names=["S","M","T","W","T","F","S"];let html="",noteItems=[];
+    for(let m=0;m<12;m++){
+      const h=holidays(y,m),count=daysInMonth(y,m),first=new Date(y,m,1).getDay(),evDates=[];
+      for(let d=1;d<=count;d++)if(eventsFor(y,m,d).length)evDates.push(d);
       let cells="";
-      for(let i=0;i<first;i++) cells+="<span></span>";
+      for(let i=0;i<first;i++)cells+=`<span></span>`;
       for(let d=1;d<=count;d++){
-        const evs=eventsFor(y,m,d);
-        const today=new Date();
-        const istoday=today.getFullYear()===y&&today.getMonth()===m&&today.getDate()===d;
-        const cls=["mini-day"];
-        if(evs.length) cls.push("note-day");
-        if(istoday) cls.push("today-day");
-        const tip=esc(evs.map(e=>eventLabel(e,y)).join(" · "));
-        cells+=`<button class="${cls.join(" ")}" data-year-day="${m}-${d}" title="${tip}">${d}${evs.length?'<span class="note-dot"></span>':""}</button>`;
-        evs.forEach(ev=>items.push({m,d,text:eventLabel(ev,y)}));
+        const has=eventsFor(y,m,d).length,cls=["mini-day"];if(has)cls.push("note-day");if(h[d])cls.push("holiday-day");
+        if(y===now.getFullYear()&&m===now.getMonth()&&d===now.getDate())cls.push("today-day");
+        cells+=`<button type="button" class="${cls.join(" ")}" data-mini-date="${m}-${d}">${d}${has?'<i class="note-dot"></i>':""}</button>`;
+        eventsFor(y,m,d).forEach(ev=>noteItems.push({m,d,ev}));
       }
-      return `<div class="mini-month"><div class="mini-month-title">${name}</div><div class="mini-week">${weekNames.map(w=>`<span>${w}</span>`).join("")}</div><div class="mini-days">${cells}</div></div>`;
-    }).join("");
-    list.innerHTML=items.length
-      ? items.map(x=>`<div class="year-note-item"><div class="year-note-date">${MONTHS[x.m].slice(0,3)} ${x.d}</div><div class="year-note-text">${esc(x.text)}</div></div>`).join("")
-      : `<div class="empty-countdowns">No saved notes in ${y}.</div>`;
-    grid.querySelectorAll("[data-year-day]").forEach(btn=>{
-      btn.onclick=()=>{
-        const [m,d]=btn.dataset.yearDay.split("-").map(Number);
-        state.month=m; state.day=d; rebuildWheels(); render();
-        setCalendarView("month");
-      };
-    });
+      html+=`<article class="mini-month"><div class="mini-month-title">${MONTHS[m]}</div><div class="mini-week">${names.map(n=>`<span>${n}</span>`).join("")}</div><div class="mini-days">${cells}</div></article>`;
+    }
+    $("yearGrid").innerHTML=html;
+    $("yearGrid").querySelectorAll("[data-mini-date]").forEach(b=>b.onclick=()=>{const [m,d]=b.dataset.miniDate.split("-").map(Number);state.month=m;state.day=d;renderAll();setView("month");scrollToCalendar()});
+    $("yearNoteList").innerHTML=noteItems.length
+      ? noteItems.map(x=>`<div class="year-note-item"><div class="year-note-date">${MONTHS[x.m].slice(0,3)} ${x.d}</div><div class="year-note-text">${esc(eventLabel(x.ev,y))}</div></div>`).join("")
+      : `<div class="empty-countdowns">No notes in ${y}.</div>`;
   }
 
-  function focusCalendar(view){
-    const target=document.getElementById(view==="year" ? "yearView" : "monthView");
-    if(!target) return;
-    // Let the view finish rendering/layout before moving the page, so the
-    // picker slides naturally out of the way and the calendar gets the focus.
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      target.scrollIntoView({behavior:"smooth",block:"start"});
-    }));
+  function renderSelectedDate(){ $("selectedDate").innerHTML=`Selected date: <strong>${dateObj(state.year,state.month,state.day).toLocaleDateString(undefined,{month:"long",day:"numeric",year:"numeric"})}</strong>` }
+  function renderAll(){renderSelectedDate();renderCalendar();renderInfo();if(calendarView==="year")renderYearView();renderCountdowns()}
+
+  function scrollToCalendar(){
+    setTimeout(()=>$("calendarCard").scrollIntoView({behavior:"smooth",block:"start"}),80);
   }
 
-  function setCalendarView(view, shouldScroll=true){
+  function setView(view){
     calendarView=view;
-    document.getElementById("monthView").style.display=view==="month"?"":"none";
-    document.getElementById("yearView").classList.toggle("open",view==="year");
-    document.getElementById("monthViewBtn").classList.toggle("active",view==="month");
-    document.getElementById("yearViewBtn").classList.toggle("active",view==="year");
-    if(view==="year") renderYearView();
-    if(shouldScroll){
-      requestAnimationFrame(()=>requestAnimationFrame(()=>focusCalendar(view)));
-    }
+    $("monthViewBtn").classList.toggle("active",view==="month");
+    $("yearViewBtn").classList.toggle("active",view==="year");
+    $("yearView").classList.toggle("open",view==="year");
+    renderAll();
+    setTimeout(()=>$("calendarCard").scrollIntoView({behavior:"smooth",block:"start"}),80);
   }
 
-  function render(){
-    const y=state.year,m=state.month,d=state.day;
-    document.getElementById("monthTitle").textContent=`${MONTHS[m]} ${y}`;
-    const date=new Date(y,m,d);
-    const holidayMap=holidays(y,m+1);
-    document.getElementById("dateDescription").textContent=`${WEEKDAYS[date.getDay()]}, ${MONTHS[m]} ${d}, ${y}`;
-    document.getElementById("week").innerHTML=WEEKDAYS.map(x=>`<div>${x.slice(0,3)}</div>`).join("");
-
-    const first=new Date(y,m,1).getDay(), total=daysInMonth(y,m);
-    const cells=[];
-    for(let i=0;i<first;i++) cells.push('<div class="day empty"></div>');
-    for(let n=1;n<=total;n++){
-      const holiday=holidayMap[n];
-      const dayEvents=eventsFor(y,m,n);
-      const eventText=dayEvents.length?eventLabel(dayEvents[0],y):"";
-      cells.push(`<div class="day ${n===d?'selected ':''}${holiday?'holiday ':''}${dayEvents.length?'has-event':''}" data-day="${n}">
-        <div class="day-num">${n}</div>${holiday?`<div class="holiday-name" title="${holiday}">${holiday}</div>`:""}${eventText?`<div class="calendar-event" style="--event-color:${eventColor(dayEvents[0])}" title="${eventText}">${eventText}</div>`:""}
-      </div>`);
-    }
-    document.getElementById("days").innerHTML=cells.join("");
-    document.querySelectorAll(".day[data-day]").forEach(el=>el.addEventListener("click",()=>{
-      state.day=Number(el.dataset.day); rebuildDayWheel(); render();
-    }));
-    const selectedEvents=eventsFor(y,m,d);
-    let info=holidayMap[d] ? `<strong>${holidayMap[d]}</strong><br>` : "";
-    info += `Selected date: <strong>${WEEKDAYS[date.getDay()]}, ${MONTHS[m]} ${d}, ${y}</strong>.`;
-    if(selectedEvents.length) info += `<br><strong>${selectedEvents.map(ev=>eventLabel(ev,y)).join("<br>")}</strong>`;
-    const infoEl=document.getElementById("info");
-    const savedNotes=eventsFor(y,m,d);
-    const noteRows=savedNotes.length ? `<div class="date-note-list">${
-      savedNotes.map((ev,i)=>`<button type="button" class="date-note note-button" data-note-id="${ev.id}">
-        <div class="date-note-text">
-          <div class="date-note-title">${esc(ev.note||"Note")}</div>
-          <div class="date-note-meta">${
-          ev.repeat==="yearly" && ev.age
-            ? `${Math.max(0,y-ev.y)} years`
-            : (ev.repeat==="none" ? "One time" : ev.repeat.charAt(0).toUpperCase()+ev.repeat.slice(1))
-        }</div>
-        </div>
-      </button>`).join("")
-    }</div>` : "";
-    infoEl.innerHTML=`
-      ${holidayMap[d]?`<strong>${holidayMap[d]}</strong><br>`:""}
-      Selected date: <strong>${WEEKDAYS[date.getDay()]}, ${MONTHS[m]} ${d}, ${y}</strong>
-      ${noteRows}
-      <div class="info-actions">
-        <button class="info-action plus" id="openNoteEditor">＋ Add note</button>
-      </div>`;
-    document.getElementById("openNoteEditor").onclick=()=>openEditor(false);
-    document.querySelectorAll(".note-button").forEach(btn=>{
-      btn.onclick=()=>openEditor(true, Number(btn.dataset.noteId));
-    });
-    if(!document.getElementById("eventEditor").classList.contains("open")) refreshEventEditor();
-    renderCountdowns();
-    if(calendarView==="year") renderYearView();
+  function openModal(){ $("editorBackdrop").classList.add("open");$("eventEditor").classList.add("open") }
+  function closeModal(){ $("editorBackdrop").classList.remove("open");$("eventEditor").classList.remove("open");editingId=null }
+  function updateCategoryButtons(){
+    document.querySelectorAll(".quick-add-btn").forEach(b=>b.classList.toggle("active",b.dataset.quick===selectedType));
+  }
+  function updateCountdownFields(){
+    const on=$("countdownToggle").checked,btn=$("countdownClockButton");
+    btn.disabled=!on;btn.classList.toggle("enabled",on);btn.title=on?"Set countdown time":"Select Add countdown clock first";
   }
 
-  document.getElementById("prevMonth").onclick=()=>{
-    state.month--; if(state.month<0){state.month=11;state.year--;}
-    state.day=Math.min(state.day,daysInMonth(state.year,state.month)); rebuildWheels(); render();
-  };
-  document.getElementById("nextMonth").onclick=()=>{
-    state.month++; if(state.month>11){state.month=0;state.year++;}
-    state.day=Math.min(state.day,daysInMonth(state.year,state.month)); rebuildWheels(); render();
-  };
-  document.getElementById("todayBtn").onclick=()=>{
-    const now=new Date(); state.year=now.getFullYear();state.month=now.getMonth();state.day=now.getDate();
-    rebuildWheels();render();
-  };
+  function renderDateNoteList(){
+    const evs=eventsFor(state.year,state.month,state.day);
+    $("editorTitle").textContent=`Notes for ${MONTHS[state.month]} ${state.day}, ${state.year}`;
+    $("dateNoteList").innerHTML=evs.length?evs.map(ev=>`<button type="button" class="date-note" data-note-id="${ev.id}"><div class="date-note-title">${esc(eventLabel(ev,state.year))}</div><div class="date-note-meta">${ev.repeat==="none"?"Does not repeat":"Repeats "+ev.repeat}${ev.age?" · tracks years":""}</div></button>`).join(""):`<div class="empty-countdowns">No notes saved on this date.</div>`;
+    $("dateNoteList").querySelectorAll("[data-note-id]").forEach(b=>b.onclick=()=>openEditor(true,Number(b.dataset.noteId)));
+  }
 
-  // Initial render
-  wireEvents();
-  rebuildWheels();
-  render();
+  function openDateNotes(){editingId=null;$("dateNoteArea").style.display="block";$("noteForm").style.display="none";renderDateNoteList();openModal()}
+  function openEditor(edit=false,id=null){
+    $("dateNoteArea").style.display="none";$("noteForm").style.display="block";editingId=edit?id:null;
+    const ev=edit?loadEvents().find(e=>Number(e.id)===Number(id)):null;
+    selectedType=ev?.type||"custom";
+    $("noteInput").value=ev?.note||"";$("repeatSelect").value=ev?.repeat||"none";$("ageToggle").checked=!!ev?.age;
+    $("deleteNote").disabled=!ev; $("countdownToggle").checked=false;$("countdownTime").value="00:00";
+    const c=loadCountdowns().find(x=>Number(x.eventId)===Number(ev?.id));
+    if(c){$("countdownToggle").checked=true;$("countdownTime").value=c.time||"00:00"}
+    updateCategoryButtons();updateCountdownFields();
+    $("editorTitle").textContent=edit?"Edit note":`Add note for ${MONTHS[state.month]} ${state.day}, ${state.year}`;
+    $("eventPreview").textContent=ev?`Saved as ${ev.repeat==="none"?"one-time":ev.repeat}${ev.age?" · yearly age/year tracking":""}${c?" · countdown set":""}":"";
+    openModal();
+  }
+
+  function saveCurrent(){
+    const note=$("noteInput").value.trim();if(!note){$("noteInput").focus();return}
+    const repeat=$("repeatSelect").value,age=$("ageToggle").checked;
+    let events=loadEvents(),id=editingId;
+    if(id!==null){
+      const i=events.findIndex(e=>Number(e.id)===Number(id));
+      if(i>=0)events[i]={...events[i],y:state.year,m:state.month,d:state.day,note,repeat,age,type:selectedType};
+    }else{
+      id=Date.now()+Math.floor(Math.random()*1000);
+      events.push({id,y:state.year,m:state.month,d:state.day,note,repeat,age,type:selectedType});
+    }
+    saveEvents(events);
+    let cds=loadCountdowns().filter(c=>Number(c.eventId)!==Number(id));
+    if($("countdownToggle").checked){
+      const time=$("countdownTime").value||"00:00";
+      cds.push({id:`c-${id}`,eventId:id,y:state.year,m:state.month,d:state.day,time,title:note,color:eventColor(selectedType)});
+    }
+    saveCountdowns(cds);
+    closeModal();renderAll();scrollToCalendar();
+  }
+
+  function deleteCurrent(){
+    if(editingId===null)return;
+    saveEvents(loadEvents().filter(e=>Number(e.id)!==Number(editingId)));
+    saveCountdowns(loadCountdowns().filter(c=>Number(c.eventId)!==Number(editingId)));
+    closeModal();renderAll();scrollToCalendar();
+  }
+
+  function localCountdownTarget(c){
+    const [h,m]=(c.time||"00:00").split(":").map(Number);return dateObj(c.y,c.m,c.d,h||0,m||0);
+  }
+  function renderCountdowns(){
+    const all=loadCountdowns(),now2=new Date(),active=all.filter(c=>localCountdownTarget(c)>now2).sort((a,b)=>localCountdownTarget(a)-localCountdownTarget(b));
+    $("countdownCount").textContent=`${active.length} active`;
+    if(!active.length){$("countdownList").innerHTML='<div class="empty-countdowns">No active countdown clocks yet. Pick a future date, add a note, and turn on “Add countdown clock.”</div>';return}
+    $("countdownList").innerHTML=active.map(c=>{
+      let ms=localCountdownTarget(c)-now2,days=Math.floor(ms/86400000);ms%=86400000;
+      let hours=Math.floor(ms/3600000);ms%=3600000;let mins=Math.floor(ms/60000);ms%=60000;let secs=Math.floor(ms/1000);
+      const target=localCountdownTarget(c).toLocaleString(undefined,{month:"long",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"});
+      return `<article class="countdown-card" style="--card-color:${c.color||COLORS.custom}"><button class="delete-countdown" type="button" data-countdown-id="${esc(c.id)}">×</button><div class="countdown-title">${esc(c.title||"Countdown")}</div><div class="countdown-target">Until ${target}</div><div class="countdown-time"><div class="countdown-unit"><div class="countdown-number">${String(days).padStart(2,"0")}</div><div class="countdown-label">Days</div></div><div class="countdown-unit"><div class="countdown-number">${String(hours).padStart(2,"0")}</div><div class="countdown-label">Hours</div></div><div class="countdown-unit"><div class="countdown-number">${String(mins).padStart(2,"0")}</div><div class="countdown-label">Min</div></div><div class="countdown-unit"><div class="countdown-number">${String(secs).padStart(2,"0")}</div><div class="countdown-label">Sec</div></div></div></article>`;
+    }).join("");
+    $("countdownList").querySelectorAll(".delete-countdown").forEach(b=>b.onclick=()=>{saveCountdowns(loadCountdowns().filter(c=>String(c.id)!==String(b.dataset.countdownId)));renderCountdowns()});
+  }
+
+  $("todayBtn").onclick=()=>{const n=new Date();state.year=n.getFullYear();state.month=n.getMonth();state.day=n.getDate();rebuildWheels();renderAll();scrollToCalendar()};
+  $("yearTodayBtn").onclick=$("todayBtn").onclick;
+  $("prevMonth").onclick=()=>{if(state.month===0){if(state.year>YEAR_MIN){state.year--;state.month=11}else return}else state.month--;state.day=Math.min(state.day,daysInMonth(state.year,state.month));rebuildWheels();renderAll();scrollToCalendar()};
+  $("nextMonth").onclick=()=>{if(state.month===11){if(state.year<YEAR_MAX){state.year++;state.month=0}else return}else state.month++;state.day=Math.min(state.day,daysInMonth(state.year,state.month));rebuildWheels();renderAll();scrollToCalendar()};
+  $("monthViewBtn").onclick=()=>setView("month");$("yearViewBtn").onclick=()=>setView("year");
+  $("closeEditor").onclick=closeModal;$("editorBackdrop").onclick=closeModal;$("clearEvent").onclick=closeModal;
+  $("addNoteBtn").onclick=()=>openEditor(false);$("saveEvent").onclick=saveCurrent;$("deleteNote").onclick=deleteCurrent;
+  document.querySelectorAll(".quick-add-btn").forEach(b=>b.onclick=()=>{selectedType=b.dataset.quick;updateCategoryButtons()});
+  $("countdownToggle").onchange=updateCountdownFields;
+  $("countdownClockButton").onclick=()=>{
+    if(!$("countdownToggle").checked)return;
+    const input=$("countdownTime");
+    try{if(typeof input.showPicker==="function")input.showPicker();else input.click()}catch{input.click()}
+  };
+  $("countdownTime").onchange=()=>{if($("countdownToggle").checked)$("eventPreview").textContent=`Countdown time: ${$("countdownTime").value}`};
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("eventEditor").classList.contains("open"))closeModal()});
   setInterval(renderCountdowns,1000);
+
+  rebuildWheels();renderAll();
 })();
 </script>
 </body>
