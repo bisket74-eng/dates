@@ -264,10 +264,7 @@
           <button type="button" class="quick-add-btn" data-quick="trip">✈️ Trip</button>
           <button type="button" class="quick-add-btn" data-quick="retirement">💼 Retirement</button>
           <button type="button" class="quick-add-btn" data-quick="custom">📌 Custom</button>
-          <button type="button" class="quick-add-btn" data-quick="countdown">⏱️ Countdown Clock</button>
-          <div class="countdown-fields" id="countdownFields" hidden>
-            <input id="countdownTime" type="time" value="00:00" aria-label="Countdown time">
-          </div>
+          <span></span>
         </div>
       </div>
       <div class="auto-color-legend" aria-label="Automatic event colors">
@@ -277,6 +274,7 @@
         <span><i style="background:#e4b84d"></i>Retirement</span>
         <span><i style="background:#f29a3f"></i>Other</span>
       </div>
+      <input id="countdownTime" type="hidden" value="00:00">
       <div class="event-grid">
         <textarea class="notes" id="noteInput" placeholder="Write a note for this date…"></textarea>
         <select class="repeat-select" id="repeatSelect" aria-label="Repeat">
@@ -457,7 +455,15 @@
 
   const EVENT_KEY="perpetualCalendarEvents_v1";
   const COUNTDOWN_KEY="perpetualCalendarCountdowns_v1";
-  function loadEvents(){try{return JSON.parse(localStorage.getItem(EVENT_KEY)||"[]")}catch{return []}}
+  function loadEvents(){
+    try{
+      const list=JSON.parse(localStorage.getItem(EVENT_KEY)||"[]");
+      let changed=false;
+      list.forEach(ev=>{if(ev.id==null){ev.id=Date.now()+Math.floor(Math.random()*100000);changed=true} if(!ev.type){ev.type="custom";changed=true}});
+      if(changed)localStorage.setItem(EVENT_KEY,JSON.stringify(list));
+      return list;
+    }catch{return []}
+  }
   function saveEvents(list){localStorage.setItem(EVENT_KEY,JSON.stringify(list))}
   function loadCountdowns(){try{return JSON.parse(localStorage.getItem(COUNTDOWN_KEY)||"[]")}catch{return []}}
   function saveCountdowns(list){localStorage.setItem(COUNTDOWN_KEY,JSON.stringify(list))}
@@ -488,55 +494,55 @@
     document.querySelectorAll(".delete-countdown").forEach(btn=>btn.onclick=()=>{saveCountdowns(loadCountdowns().filter(c=>String(c.id)!==String(btn.dataset.countdownId)));renderCountdowns()});
   }
   function refreshEventEditor(){
-    const key=iso(state.year,state.month,state.day),ev=loadEvents().find(x=>iso(x.y,x.m,x.d)===key),c=loadCountdowns().find(x=>x.y===state.year&&x.m===state.month&&x.d===state.day);
-    document.getElementById("noteInput").value=ev?.note||"";document.getElementById("repeatSelect").value=ev?.repeat||"none";document.getElementById("ageToggle").checked=!!ev?.age;
+    const key=iso(state.year,state.month,state.day);
+    const evs=eventsFor(state.year,state.month,state.day);
+    const ev=window.__editingNoteId!==null && window.__editingNoteId!==undefined
+      ? loadEvents().find(x=>Number(x.id)===Number(window.__editingNoteId))
+      : evs[0];
+    const c=ev ? loadCountdowns().find(x=>Number(x.eventId)===Number(ev.id)) : null;
+    document.getElementById("noteInput").value=ev?.note||"";
+    document.getElementById("repeatSelect").value=ev?.repeat||"none";
+    document.getElementById("ageToggle").checked=!!ev?.age;
     document.getElementById("deleteNote").disabled=!ev;
-    document.getElementById("countdownToggle").checked=!!c;document.getElementById("countdownTime").value=c?.time||"00:00";updateCountdownFields();
-    let p=ev?`Saved note: ${ev.repeat}${ev.age?" · age tracking":""}`:"No saved note for this date.";if(c)p+=` · Countdown: ${c.title||ev?.note||"Untitled"}`;document.getElementById("eventPreview").textContent=p;
+    document.getElementById("countdownToggle").checked=!!c;
+    document.getElementById("countdownTime").value="00:00";
+    updateCountdownFields();
+    let p=ev?`Saved note: ${ev.repeat}${ev.age?" · age tracking":""}`:"No saved note for this date.";
+    if(c)p+=" · Countdown: beginning of day";
+    document.getElementById("eventPreview").textContent=p;
+    document.querySelectorAll(".quick-add-btn").forEach(b=>b.classList.toggle("active",b.dataset.quick===ev?.type));
   }
-  function updateCountdownFields(){const on=document.getElementById("countdownToggle").checked;document.getElementById("countdownFields").hidden=!on;document.getElementById("countdownHint").hidden=!on}
+  function updateCountdownFields(){
+    // Countdown clocks always target midnight (the beginning of the selected date).
+    document.getElementById("countdownTime").value="00:00";
+  }
   function openEditor(edit=false, noteId=null){
-    window.__editingNoteId = edit ? noteId : null;
-
+    window.__editingNoteId = edit && noteId!==null ? Number(noteId) : null;
     const panel=document.getElementById("eventEditor"),back=document.getElementById("editorBackdrop");
     panel.classList.add("open");back.classList.add("open");
     refreshEventEditor();
-    if(edit && noteId!==null){
-      const target=eventsFor(state.year,state.month,state.day).find(x=>Number(x.id)===Number(noteId));
-      if(target){
-        document.getElementById("note").value=target.note||"";
-        document.getElementById("repeat").value=target.repeat||"none";
-        document.getElementById("age").checked=!!target.age;
-        document.querySelectorAll(".quick-add-btn").forEach(b=>b.classList.toggle("active",b.dataset.quick===target.type));
-        if(document.getElementById("countdownToggle")){
-          const c=(typeof countdownsFor==="function"?countdownsFor(state.year,state.month,state.day):[]).find(x=>x.eventId===target.id);
-          document.getElementById("countdownToggle").checked=!!c;
-          if(document.getElementById("countdownTime")) document.getElementById("countdownTime").value=c?.time||"00:00";
-          updateCountdownFields();
-        }
-      }
-    }
-
-    if(!editExisting){
+    if(!edit){
       document.getElementById("noteInput").value="";
       document.getElementById("repeatSelect").value="none";
       document.getElementById("ageToggle").checked=false;
       document.getElementById("countdownToggle").checked=false;
-      document.getElementById("countdownTime").value="00:00";
       updateCountdownFields();
+      document.getElementById("deleteNote").disabled=true;
       document.getElementById("eventPreview").textContent="Add a note for this date.";
+      document.querySelectorAll(".quick-add-btn").forEach(b=>b.classList.remove("active"));
     }
     setTimeout(()=>document.getElementById("noteInput").focus(),80);
   }
   function closeEditor(){
     document.getElementById("eventEditor").classList.remove("open");
     document.getElementById("editorBackdrop").classList.remove("open");
+    window.__editingNoteId=null;
   }
   function wireEvents(){
     document.getElementById("monthViewBtn").onclick=()=>setCalendarView("month");
     document.getElementById("yearViewBtn").onclick=()=>setCalendarView("year");
-    document.getElementById("yearPrev").onclick=()=>{state.year--; rebuildWheels(); render();};
-    document.getElementById("yearNext").onclick=()=>{state.year++; rebuildWheels(); render();};
+    document.getElementById("yearPrev").onclick=()=>{if(state.year>YEAR_MIN){state.year--;state.day=Math.min(state.day,daysInMonth(state.year,state.month));rebuildWheels();render();}};
+    document.getElementById("yearNext").onclick=()=>{if(state.year<YEAR_MAX){state.year++;state.day=Math.min(state.day,daysInMonth(state.year,state.month));rebuildWheels();render();}};
 
     document.querySelectorAll(".quick-add-btn").forEach(btn=>{
       btn.onclick=()=>{
@@ -545,7 +551,6 @@
         const repeat=document.getElementById("repeatSelect");
         const age=document.getElementById("ageToggle");
         const countdown=document.getElementById("countdownToggle");
-        const title=document.getElementById("countdownTitle");
         const presets={
           birthday:{text:"Birthday",repeat:"yearly",age:true,countdown:false},
           anniversary:{text:"Anniversary",repeat:"yearly",age:true,countdown:false},
@@ -553,44 +558,71 @@
           retirement:{text:"Retirement",repeat:"none",age:false,countdown:true},
           custom:{text:"",repeat:"none",age:false,countdown:false}
         };
-        const preset=presets[type];
-        if(!preset) return;
-        if(preset.text) note.value=preset.text;
-        repeat.value=preset.repeat;
-        age.checked=preset.age;
-        countdown.checked=preset.countdown;
-        if(preset.countdown){
-          updateCountdownFields();
-          document.getElementById("eventPreview").textContent="Add the countdown date/time and save.";
-        }else{
-          updateCountdownFields();
-          document.getElementById("eventPreview").textContent=`Quick Add: ${preset.text || "Custom"}`;
-        }
+        const preset=presets[type]; if(!preset)return;
+        if(preset.text)note.value=preset.text;
+        repeat.value=preset.repeat; age.checked=preset.age; countdown.checked=preset.countdown;
+        document.querySelectorAll(".quick-add-btn").forEach(b=>b.classList.toggle("active",b===btn));
+        updateCountdownFields();
+        document.getElementById("eventPreview").textContent=preset.countdown
+          ? "Countdown will begin at midnight on this date."
+          : `Quick Add: ${preset.text||"Custom"}`;
         note.focus();
       };
     });
     document.getElementById("closeEditor").onclick=closeEditor;
     document.getElementById("editorBackdrop").onclick=closeEditor;
     document.addEventListener("keydown",e=>{if(e.key==="Escape")closeEditor()});
-    document.getElementById("countdownToggle").onchange=updateCountdownFields;
+    document.getElementById("countdownToggle").onchange=()=>{
+      updateCountdownFields();
+      document.getElementById("eventPreview").textContent=document.getElementById("countdownToggle").checked
+        ? "Countdown will begin at midnight on this date."
+        : "";
+    };
     document.getElementById("saveEvent").onclick=()=>{
-      const note=document.getElementById("noteInput").value.trim(),repeat=document.getElementById("repeatSelect").value,age=document.getElementById("ageToggle").checked&&repeat==="yearly",on=document.getElementById("countdownToggle").checked,key=iso(state.year,state.month,state.day);
-      const events=loadEvents().filter(x=>iso(x.y,x.m,x.d)!==key);if(note)events.push({y:state.year,m:state.month,d:state.day,note,repeat,age});saveEvents(events);
-      let cs=loadCountdowns().filter(c=>!(c.y===state.year&&c.m===state.month&&c.d===state.day));
-      if(on){const time=document.getElementById("countdownTime").value||"00:00",[hh,mm]=time.split(":").map(Number),target=new Date(state.year,state.month,state.day,hh,mm,0,0);if(target<=new Date()){alert("A countdown clock needs a future date and time. Please choose a future date.");render();return}cs.push({id:Date.now(),y:state.year,m:state.month,d:state.day,time,title:note||"Countdown",color:eventColor({type})})}
-      saveCountdowns(cs);render();refreshEventEditor();renderCountdowns();closeEditor();
+      const note=document.getElementById("noteInput").value.trim();
+      const repeat=document.getElementById("repeatSelect").value;
+      const age=document.getElementById("ageToggle").checked&&repeat==="yearly";
+      const on=document.getElementById("countdownToggle").checked;
+      const key=iso(state.year,state.month,state.day);
+      let events=loadEvents();
+      const editingId=window.__editingNoteId;
+      if(editingId!==null && editingId!==undefined){
+        const idx=events.findIndex(x=>Number(x.id)===Number(editingId));
+        if(idx>=0){
+          events[idx]={...events[idx],y:state.year,m:state.month,d:state.day,note,repeat,age,type:events[idx].type||"custom"};
+        }
+      }else if(note){
+        const type=(document.querySelector(".quick-add-btn.active")?.dataset.quick)||"custom";
+        events.push({id:Date.now(),y:state.year,m:state.month,d:state.day,note,repeat,age,type});
+      }
+      saveEvents(events);
+      // One countdown per saved note. Its target is always midnight at the beginning of the selected date.
+      const savedEvent=editingId!==null&&editingId!==undefined
+        ? events.find(x=>Number(x.id)===Number(editingId))
+        : events.find(x=>x.y===state.year&&x.m===state.month&&x.d===state.day&&x.note===note);
+      let cs=loadCountdowns();
+      if(savedEvent){
+        cs=cs.filter(c=>Number(c.eventId)!==Number(savedEvent.id));
+        if(on){
+          const target=new Date(state.year,state.month,state.day,0,0,0,0);
+          if(target>new Date()){
+            cs.push({id:Date.now()+1,eventId:savedEvent.id,y:state.year,m:state.month,d:state.day,time:"00:00",title:note||"Countdown",color:eventColor(savedEvent)});
+          }
+        }
+      }
+      saveCountdowns(cs);
+      render();
+      closeEditor();
     };
     document.getElementById("deleteNote").onclick=()=>{
-      const key=iso(state.year,state.month,state.day);
-      saveEvents(loadEvents().filter(x=>iso(x.y,x.m,x.d)!==key));
-      document.getElementById("noteInput").value="";
-      document.getElementById("repeatSelect").value="none";
-      document.getElementById("ageToggle").checked=false;
-      render();refreshEventEditor();renderCountdowns();closeEditor();
+      const id=window.__editingNoteId;
+      if(id===null||id===undefined)return;
+      saveEvents(loadEvents().filter(x=>Number(x.id)!==Number(id)));
+      saveCountdowns(loadCountdowns().filter(c=>Number(c.eventId)!==Number(id)));
+      render();closeEditor();
     };
-    document.getElementById("clearEvent").onclick=()=>{const key=iso(state.year,state.month,state.day);saveEvents(loadEvents().filter(x=>iso(x.y,x.m,x.d)!==key));saveCountdowns(loadCountdowns().filter(c=>!(c.y===state.year&&c.m===state.month&&c.d===state.day)));render();refreshEventEditor();renderCountdowns();closeEditor()};
+    document.getElementById("clearEvent").onclick=closeEditor;
   }
-
 
   let calendarView="month";
 
