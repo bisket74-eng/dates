@@ -681,7 +681,7 @@
         const dayColor=evs.length?eventColor(evs[0]):"";
         const dayStyle=dayColor?` style="--event-color:${dayColor}"`:"";
         cells+=`<button class="${cls.join(" ")}"${dayStyle} data-year-day="${m}-${d}" title="${tip}">${d}${evs.length?'<span class="note-dot"></span>':""}</button>`;
-        evs.forEach(ev=>items.push({m,d,text:eventLabel(ev,y)}));
+        evs.forEach(ev=>{ if(ev.repeat==="yearly") items.push({m,d,text:eventLabel(ev,y)}); });
       }
       return `<div class="mini-month"><div class="mini-month-title">${name}</div><div class="mini-week">${weekNames.map(w=>`<span>${w}</span>`).join("")}</div><div class="mini-days">${cells}</div></div>`;
     }).join("");
