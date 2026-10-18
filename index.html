@@ -192,6 +192,13 @@
   .auto-color-legend span{display:inline-flex;align-items:center;gap:5px}
   .auto-color-legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
   .countdown-fields{min-height:44px;display:flex;align-items:center;justify-content:center}.countdown-fields[hidden]{display:none}.countdown-fields input{width:100%;height:44px;border:1px solid var(--line);border-radius:11px;background:#151b24;color:var(--text);padding:0 11px;font:inherit;outline:none}.countdown-fields input:focus{border-color:var(--accent)}
+  .backup-tools{margin-top:10px;text-align:center;color:var(--muted);font-size:.72rem}
+  .backup-toggle{border:0;background:transparent;color:#748198;padding:4px 7px;font-size:.72rem;opacity:.72}
+  .backup-toggle:hover{background:transparent;color:var(--text);opacity:1;transform:none}
+  .backup-menu{display:none;justify-content:center;gap:7px;margin-top:5px}
+  .backup-menu.open{display:flex}
+  .backup-menu button{padding:6px 9px;border-radius:9px;font-size:.72rem;background:#121821}
+  #importBackupInput{display:none}
   .countdowns-panel{margin-top:18px;padding:18px;background:#111720;border:1px solid var(--line);border-radius:18px}.countdowns-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.countdowns-head h3{margin:0;font-size:1.05rem}.countdowns-head span{color:var(--muted);font-size:.8rem}.countdown-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.countdown-card{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:16px;background:linear-gradient(135deg,#171f2a,#111720);padding:16px}.countdown-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--card-color,#7c9cff)}.countdown-title{font-size:1.05rem;font-weight:750;padding-left:5px;padding-right:28px}.countdown-target{color:var(--muted);font-size:.8rem;margin:5px 0 13px;padding-left:5px}.countdown-time{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-left:5px}.countdown-unit{background:#0e141c;border:1px solid var(--line);border-radius:10px;padding:8px 4px;text-align:center}.countdown-number{font-size:1.15rem;font-weight:800;line-height:1.1}.countdown-label{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:3px}.delete-countdown{position:absolute;right:10px;top:9px;border:0;background:transparent;padding:4px 7px;color:var(--muted);font-size:1.1rem}.delete-countdown:hover{color:var(--text);background:#242d3a;transform:none}.empty-countdowns{color:var(--muted);padding:10px 2px}
   @media(max-width:650px){.countdown-fields{grid-template-columns:1fr 1fr}.countdown-fields input:first-child{grid-column:1/-1}.countdown-list{grid-template-columns:1fr}.countdowns-panel{padding:14px}}
 </style>
@@ -301,6 +308,15 @@
       <div class="countdown-list" id="countdownList"></div>
     </section>
   </section>
+
+  <div class="backup-tools" aria-label="Calendar backup">
+    <button type="button" class="backup-toggle" id="backupToggle">Backup / Restore</button>
+    <div class="backup-menu" id="backupMenu">
+      <button type="button" id="exportBackup">Export</button>
+      <button type="button" id="importBackup">Import</button>
+    </div>
+    <input type="file" id="importBackupInput" accept="application/json,.json">
+  </div>
 </div>
 
 <script>
@@ -774,8 +790,64 @@
     rebuildWheels();render();
   };
 
+  function setupBackupTools(){
+    const toggle=document.getElementById("backupToggle");
+    const menu=document.getElementById("backupMenu");
+    const exportBtn=document.getElementById("exportBackup");
+    const importBtn=document.getElementById("importBackup");
+    const input=document.getElementById("importBackupInput");
+    if(!toggle||!menu||!exportBtn||!importBtn||!input) return;
+
+    toggle.onclick=()=>menu.classList.toggle("open");
+
+    exportBtn.onclick=()=>{
+      const backup={
+        format:"Perpetual Calendar Backup",
+        version:1,
+        exportedAt:new Date().toISOString(),
+        events:loadEvents(),
+        countdowns:loadCountdowns()
+      };
+      const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      const stamp=new Date().toISOString().slice(0,10);
+      a.href=url;
+      a.download=`perpetual-calendar-backup-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+      menu.classList.remove("open");
+    };
+
+    importBtn.onclick=()=>{input.value="";input.click()};
+    input.onchange=async()=>{
+      const file=input.files?.[0];
+      if(!file) return;
+      try{
+        const text=await file.text();
+        const data=JSON.parse(text);
+        if(!data || data.format!=="Perpetual Calendar Backup" || !Array.isArray(data.events) || !Array.isArray(data.countdowns)){
+          throw new Error("Invalid backup file");
+        }
+        if(!confirm("Import this backup? It will replace the calendar data currently saved on this device.")) return;
+        saveEvents(data.events);
+        saveCountdowns(data.countdowns);
+        localStorage.setItem(COLOR_MIGRATION_KEY,"1");
+        render();
+        if(calendarView==="year") renderYearView();
+        menu.classList.remove("open");
+        alert("Calendar backup restored.");
+      }catch(err){
+        alert("That backup file could not be imported.");
+      }
+    };
+  }
+
   // Initial render
   wireEvents();
+  setupBackupTools();
   rebuildWheels();
   render();
   setInterval(renderCountdowns,1000);
