@@ -146,6 +146,8 @@
   .mini-days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
   .mini-day{min-height:26px;border:0;border-radius:6px;background:transparent;color:var(--text);font-size:.66rem;padding:2px;position:relative}
   .mini-day.note-day{background:color-mix(in srgb,var(--event-color,#7c9cff) 22%,#141b25);box-shadow:inset 0 -2px 0 var(--event-color,#7c9cff)}
+  .mini-day.holiday-day{background:color-mix(in srgb,#c49aff 22%,#141b25);box-shadow:inset 0 -2px 0 #c49aff;color:#f1e8ff}
+  .mini-day.holiday-day.note-day{background:color-mix(in srgb,#c49aff 22%,#141b25);box-shadow:inset 0 -2px 0 #c49aff}
   .mini-day.today-day{outline:2px solid #7c9cff}
   .mini-day .note-dot{position:absolute;right:2px;bottom:2px;width:4px;height:4px;border-radius:50%;background:#c49aff}
   .year-note-list{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
@@ -175,10 +177,11 @@
   .notes{width:100%;min-height:88px;resize:vertical;border:1px solid var(--line);border-radius:12px;background:#151b24;color:var(--text);padding:12px;font:inherit;outline:none}
   .notes:focus,.repeat-select:focus{border-color:var(--accent)}
   .repeat-select{width:100%;height:46px;border:1px solid var(--line);border-radius:12px;background:#151b24;color:var(--text);padding:0 10px;font:inherit}
-  .event-actions{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap}
+  .event-actions{display:grid;grid-template-columns:1fr auto;gap:12px;margin-top:12px;align-items:center}
+  .event-actions .age-toggle,.event-actions .countdown-option{grid-column:1/-1}
+  .event-actions #clearEvent{grid-column:1;grid-row:3;justify-self:start}
+  .event-actions #saveEvent{grid-column:2;grid-row:3;justify-self:end}
   .save-event{background:#24345c;border-color:#526da9;font-weight:700}
-  .delete-note{background:#3a2028;border-color:#75404c;color:#ffdce2;font-weight:750;min-width:42px;padding:10px 13px}
-  .delete-note:disabled{opacity:.35;cursor:not-allowed;transform:none}
   .age-toggle{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.88rem}
   .event-preview{margin-top:12px;color:var(--muted);font-size:.88rem;line-height:1.45}
   .calendar-event{--event-color:#f29a3f;position:absolute;left:7px;right:5px;bottom:6px;color:#c9d7ff;font-size:.66rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -288,9 +291,8 @@
       <div class="event-actions">
         <label class="age-toggle"><input type="checkbox" id="ageToggle"> Track age on yearly repeats</label>
         <label class="countdown-option"><input type="checkbox" id="countdownToggle"> Add countdown clock</label>
-        <button class="save-event" id="saveEvent">Save note</button>
-        <button class="delete-note" id="deleteNote" title="Delete saved note for this date" aria-label="Delete saved note" disabled>✕</button>
         <button id="clearEvent">Clear</button>
+        <button class="save-event" id="saveEvent">Save note</button>
       </div>
       <div class="event-preview" id="eventPreview"></div>
     </div>
@@ -520,7 +522,6 @@
     document.getElementById("noteInput").value=ev?.note||"";
     document.getElementById("repeatSelect").value=ev?.repeat||"none";
     document.getElementById("ageToggle").checked=!!ev?.age;
-    document.getElementById("deleteNote").disabled=!ev;
     document.getElementById("countdownToggle").checked=!!c;
     document.getElementById("countdownTime").value="00:00";
     updateCountdownFields();
@@ -544,7 +545,6 @@
       document.getElementById("ageToggle").checked=false;
       document.getElementById("countdownToggle").checked=false;
       updateCountdownFields();
-      document.getElementById("deleteNote").disabled=true;
       document.getElementById("eventPreview").textContent="Add a note for this date.";
       document.querySelectorAll(".quick-add-btn").forEach(b=>b.classList.remove("active"));
     }
@@ -631,13 +631,6 @@
       render();
       closeEditor();
     };
-    document.getElementById("deleteNote").onclick=()=>{
-      const id=window.__editingNoteId;
-      if(id===null||id===undefined)return;
-      saveEvents(loadEvents().filter(x=>Number(x.id)!==Number(id)));
-      saveCountdowns(loadCountdowns().filter(c=>Number(c.eventId)!==Number(id)));
-      render();closeEditor();
-    };
     document.getElementById("clearEvent").onclick=closeEditor;
   }
 
@@ -657,12 +650,18 @@
       for(let i=0;i<first;i++) cells+="<span></span>";
       for(let d=1;d<=count;d++){
         const evs=eventsFor(y,m,d);
+        const holidayMap=holidays(y,m+1);
+        const holiday=holidayMap[d];
         const today=new Date();
         const istoday=today.getFullYear()===y&&today.getMonth()===m&&today.getDate()===d;
         const cls=["mini-day"];
         if(evs.length) cls.push("note-day");
+        if(holiday) cls.push("holiday-day");
         if(istoday) cls.push("today-day");
-        const tip=esc(evs.map(e=>eventLabel(e,y)).join(" · "));
+        const labels=[];
+        if(holiday) labels.push(holiday);
+        if(evs.length) labels.push(...evs.map(e=>eventLabel(e,y)));
+        const tip=esc(labels.join(" · "));
         const dayColor=evs.length?eventColor(evs[0]):"";
         const dayStyle=dayColor?` style="--event-color:${dayColor}"`:"";
         cells+=`<button class="${cls.join(" ")}"${dayStyle} data-year-day="${m}-${d}" title="${tip}">${d}${evs.length?'<span class="note-dot"></span>':""}</button>`;
